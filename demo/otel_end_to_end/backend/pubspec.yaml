@@ -1,0 +1,13 @@
+name: comon_otel_demo_backend
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  comon_otel:
+    path: ../../../packages/comon_otel
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.26.2

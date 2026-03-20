@@ -1,0 +1,17 @@
+# https://dart.dev/guides/libraries/private-files
+# Created by `dart pub`
+.dart_tool/
+
+# Avoid committing pubspec.lock for library packages; see
+# https://dart.dev/guides/libraries/private-files#pubspeclock.
+.melos_tool/
+.idea/
+melos__.iml
+**/melos_*.iml
+
+# Keep the workspace lockfile, but ignore nested package lockfiles.
+**/pubspec.lock
+!/pubspec.lock
+
+# Local overrides are for isolated package resolution only.
+**/pubspec_overrides.yaml

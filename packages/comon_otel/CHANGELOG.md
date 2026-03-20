@@ -1,0 +1,84 @@
+## 0.0.1-alpha.1
+
+- First alpha release.
+- Updated repository metadata for the `serezhia/comon_opentelemetry` workspace and aligned test dependencies with the shared workspace resolution.
+- Moved the package into `packages/comon_otel` to establish the monorepo layout for future sibling packages such as `comon_otel_flutter`.
+- Added `OTEL_SDK_DISABLED` support and global propagator configuration via `OTEL_PROPAGATORS`.
+- Added `Otel.propagator`, `Otel.setPropagator(...)`, and `Otel.resetPropagator()` with a W3C trace-context plus baggage default.
+- Added a default fallback service name when `serviceName` is omitted.
+- Added env-driven batch span/log processor settings, periodic metric export timing, and span limit configuration.
+- Added `Resource.empty()`, a minimal `ResourceDetector` mechanism, and built-in process/host auto-detection.
+- Added a first-class `InstrumentationScope` model with `version`, `schemaUrl`, and attributes across tracer and meter APIs, exported span/metric models, and OTLP JSON/protobuf payloads.
+- Added a basic metric cardinality limit with overflow aggregation via `otel.metric.overflow=true` and programmatic configuration through `Otel.init(metricCardinalityLimit: ...)`.
+- Added `forceFlush()` to span, metric, and log exporter contracts, and wired `Otel.forceFlush()` through processors and metric readers down to exporter hooks.
+- Added the default OTLP `user-agent` header `OTel-OTLP-Exporter-Dart/0.0.1-alpha.1` across HTTP JSON, HTTP protobuf, and gRPC exporters.
+- Added OTLP HTTP throttling handling that honors `Retry-After` on `429` and `503` responses before retrying.
+- Added OTLP partial success handling for HTTP JSON, HTTP protobuf, and gRPC responses without retrying accepted payloads.
+- Added resource-level `schemaUrl` propagation, including `resourceSchemaUrl` support in `Otel.init(...)` and OTLP JSON/protobuf/gRPC payload encoding.
+- Implemented Phase 1 tracing MVP.
+- Added metrics and logging foundations with console and in-memory exporters.
+- Added batch processors and a periodic metric reader.
+- Added W3C trace-context propagation, W3C baggage, B3 propagation, and baggage-aware context handling.
+- Added `OtelTestHelper` for in-memory testing workflows.
+- Added OTLP HTTP JSON exporters and transport configuration hooks.
+- Added OTEL environment variable parsing and init-time config merging.
+- Added matcher helpers for span/log assertions and expanded semantic attribute constants.
+- Improved OTLP JSON payload fidelity for span kinds, status codes, and histogram metrics.
+- Added retry/backoff support for OTLP HTTP JSON exporters.
+- Added metric and trace-id matcher helpers for tests.
+- Added cumulative metric aggregation and richer histogram metric points.
+- Added propagation matcher helpers for carriers, baggage, and remote span contexts.
+- Added public integration contracts for database instrumentation and external logger bridges.
+- Added `OtelIsolate` helpers for serializable context propagation across isolate boundaries.
+- Added OTLP gzip compression support for HTTP JSON exporters.
+- Added composite span, metric, and log exporters for multi-backend fan-out.
+- Added per-signal OTLP endpoint support for traces, metrics, and logs.
+- Added per-signal OTLP header support for traces, metrics, and logs.
+- Added per-signal OTLP timeout support for traces, metrics, and logs.
+- Added per-signal OTLP compression support for traces, metrics, and logs.
+- Added per-signal OTLP retry support for traces, metrics, and logs.
+- Made `Otel.forceFlush()` wait for pending simple span and log exports.
+- Hardened W3C `traceparent` parsing to reject invalid versions, IDs, and trace flags while preserving `tracestate`.
+- Added `tracestate` normalization and validation for W3C trace-context propagation.
+- Added OTLP HTTP/protobuf exporters for traces, metrics, and logs.
+- Added OTLP gRPC exporters and a reusable gRPC transport.
+- Added a minimal OTLP protobuf encoder and binary HTTP transport support.
+- Added `OTEL_EXPORTER_OTLP_PROTOCOL` support for `http/protobuf` and `grpc`.
+- Added `SpanLink` support to the public tracing API and OTLP span encoders.
+- Added docker-backed integration tests that raise a real OpenTelemetry Collector and verify OTLP HTTP/protobuf and gRPC end-to-end export for traces, metrics, and logs.
+- Added integration coverage for per-signal OTLP HTTP endpoints, headers, compression, and timeout overrides.
+- Added delayed-start retry recovery integration tests for OTLP HTTP/protobuf and OTLP gRPC.
+- Reorganized exporter sources into dedicated console, in-memory, composite, and OTLP protocol folders.
+- Moved shared OTLP retry and HTTP transport code into `lib/src/exporters/otlp/common/` and shortened OTLP implementation filenames.
+- Added grouped public exporter barrel files for console, in-memory, composite, and OTLP imports.
+- Normalized the internal source layout around `lib/src/comon_otel.dart` as the single source aggregator.
+- Added folder-level barrel files throughout `src/` and kept a single public entrypoint at `lib/comon_otel.dart`.
+- Added typed tracing primitives `TraceId`, `SpanId`, `TraceFlags`, and `TraceState`.
+- Updated `SpanContext`, samplers, propagation, and isolate transport to use typed trace primitives internally while preserving the existing const-friendly public constructor.
+- Added explicit `SpanContext.local(...)` and `SpanContext.remote(...)` factories and moved internal typed construction to those public entrypoints.
+- Added matching typed/string convenience accessors on live `Span` instances.
+- Added typed accessors on `SpanData` and `LogRecord` so exported models expose trace ids, span ids, flags, and state directly.
+- Added matching typed/string convenience accessors on `OtelContextSnapshot` and `OtelIsolateContext`.
+- Added explicit `OtelContextSnapshot.local(...)` and `OtelContextSnapshot.remote(...)` factories.
+- Expanded `TraceState` with structured `TraceStateMember` parsing, key lookup, and builder helpers.
+- Expanded sampler decisions with `SamplerResult`, allowing samplers to carry or modify `TraceState` during span creation.
+- Added `LogRecord.current(...)` and `LogRecord.typed(...)` factories for centralized context capture and typed log correlation.
+- Updated console/OTLP exporters and matcher helpers to consume typed-aware accessors from exported models.
+- Updated `OtelLogger` to emit through `LogRecord.current(...)`.
+- Updated isolate and propagation-oriented tests to use the new snapshot/isolate accessors.
+- Updated propagation and collector integration tests to use typed-first snapshot/context factories in representative scenarios.
+- Added focused tests covering typed trace primitives, structured `TraceState` members, sampler `TraceState` decisions, `SpanContext` typed accessors/factories, and `LogRecord` factories.
+- Updated sampler contracts so `decide(...)` and `shouldSample(...)` receive span links, with runtime coverage proving samplers observe `SpanLink` inputs.
+- Updated `TraceIdRatioSampler` to write OpenTelemetry `ot=th:...` sampling thresholds into `TraceState` for sampled spans while preserving existing `ot` subkeys.
+- Split sampling results into distinct `recording` and `sampled` semantics so record-only spans can flow through processors without being exported.
+- Added `AlwaysRecordSampler` and `SamplerConfig.alwaysRecord(...)`, and updated built-in span processors to export only sampled spans.
+- Added `CompositeSampler` and built-in composable samplers for always-on, always-off, probability, parent-threshold, rule-based, and annotating sampling composition.
+- Added sampler-driven span attributes via `SamplerResult.attributes`, and covered composite probability, rule-based, annotating, and parent-threshold behavior with runtime tests.
+- Expanded `ParentBasedSampler` with configurable `remoteParentSampled`, `remoteParentNotSampled`, `localParentSampled`, and `localParentNotSampled` delegates.
+- Added runtime tests covering parent-based delegate overrides for remote sampled and local not-sampled parent contexts.
+- Added W3C Trace Context random trace flag support for root-span generation, continued-trace preservation, and propagation validation.
+- Added public `SpanLimits` configuration with enforcement for span attributes, events, links, and nested event/link attribute limits.
+- Surfaced dropped attribute/event/link counters on exported `SpanData`.
+- Added `Span.addLink(...)` and `Span.addLinks(...)` for recording links after span creation while preserving order and enforcing configured link limits.
+- Added runtime coverage for non-recording span ID generation and readable `instrumentationScope` access.
+- Added `parentSnapshot` sampler/startSpan plumbing so custom samplers can receive full parent context, including baggage, instead of only `SpanContext`.

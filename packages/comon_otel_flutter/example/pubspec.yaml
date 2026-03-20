@@ -1,0 +1,25 @@
+name: comon_otel_flutter_example
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  comon_otel:
+    version: ^0.0.1-alpha.1
+  comon_otel_flutter:
+    path: ..
+  http: ^1.6.0
+
+dependency_overrides:
+  comon_otel:
+    path: ../../comon_otel
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

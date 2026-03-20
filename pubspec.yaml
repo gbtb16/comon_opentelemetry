@@ -1,0 +1,52 @@
+name: _
+publish_to: none
+repository: https://github.com/serezhia/comon_opentelemetry
+
+environment:
+  sdk: ^3.9.0
+
+workspace:
+  - packages/comon_otel
+  - packages/comon_otel_dio
+  - packages/comon_otel_flutter
+
+dev_dependencies:
+  melos: ^7.0.0
+
+melos:
+  repository: https://github.com/serezhia/comon_opentelemetry
+  categories:
+    dart-package:
+      - packages/comon_otel
+      - packages/comon_otel_dio
+    flutter-package:
+      - packages/comon_otel_flutter
+  command:
+    bootstrap:
+      runPubGetInParallel: true
+    version:
+      branch: main
+      fetchTags: false
+      workspaceChangelog: true
+  scripts:
+    analyze:
+      description: Analyze all workspace packages.
+      run: dart run melos exec --fail-fast -- "dart analyze ."
+    test:
+      description: Run Dart and Flutter package tests.
+      run: dart run melos run test:dart && dart run melos run test:flutter
+    test:dart:
+      description: Run tests for pure Dart packages.
+      run: dart run melos exec --fail-fast --category=dart-package -- "dart test"
+    test:flutter:
+      description: Run tests for Flutter packages.
+      run: dart run melos exec --fail-fast --category=flutter-package -- "flutter test"
+    format:
+      description: Format all workspace packages.
+      run: dart run melos exec --fail-fast -- "dart format ."
+    publish:dry-run:
+      description: Validate publishability without uploading packages.
+      run: dart run melos publish --dry-run --no-private --yes
+    doc:
+      description: Generate dartdoc for all workspace packages.
+      run: dart run melos exec --fail-fast -- "dart doc"

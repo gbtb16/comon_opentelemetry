@@ -1,0 +1,30 @@
+name: comon_otel_flutter
+description: Flutter instrumentation package for comon_otel with app lifecycle, navigation, and error capture foundations.
+version: 0.0.1-alpha.1
+resolution: workspace
+homepage: https://github.com/serezhia/comon_opentelemetry/tree/main/packages/comon_otel_flutter
+repository: https://github.com/serezhia/comon_opentelemetry
+issue_tracker: https://github.com/serezhia/comon_opentelemetry/issues
+documentation: https://github.com/serezhia/comon_opentelemetry/tree/main/packages/comon_otel_flutter#readme
+topics:
+  - opentelemetry
+  - flutter
+  - observability
+  - tracing
+  - monitoring
+
+environment:
+  sdk: ^3.9.0
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  comon_otel:
+    version: ^0.0.1-alpha.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
