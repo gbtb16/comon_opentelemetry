@@ -1,0 +1,52 @@
+---
+title: comon_opentelemetry
+description: OpenTelemetry docs for Dart and Flutter with core SDK, Flutter instrumentation, and Dio client spans.
+---
+
+# comon_opentelemetry docs
+
+`comon_opentelemetry` is a Dart workspace built around three packages:
+
+- `comon_otel` for the core SDK
+- `comon_otel_flutter` for Flutter instrumentation
+- `comon_otel_dio` for HTTP client spans with Dio
+
+## Package matrix
+
+| Package | Use it for | Typical environment |
+| --- | --- | --- |
+| `comon_otel` | Traces, metrics, logs, propagation, exporters, testing helpers | Dart backend, CLI, shared libraries |
+| `comon_otel_flutter` | Navigation, lifecycle, startup, performance, interactions, error capture | Flutter mobile, desktop, and test apps |
+| `comon_otel_dio` | Client spans, trace-context propagation, HTTP attribute capture | Any Dart or Flutter app using Dio |
+
+## Architecture
+
+```text
+comon_otel
+├─ comon_otel_flutter
+└─ comon_otel_dio
+```
+
+`comon_otel` is the shared foundation. The Flutter and Dio packages add instrumentation on top of the same tracer, meter, logger, context, and propagator model.
+
+## What this workspace gives you
+
+- one async bootstrap path through `Otel.init()`
+- traces, metrics, and logs behind one global SDK entrypoint
+- W3C trace-context, W3C baggage, B3, and composite propagators
+- OTLP exporters over HTTP JSON, HTTP protobuf, and gRPC
+- in-memory exporters and helpers for tests
+- focused Flutter and Dio integrations instead of one oversized package
+
+## Recommended path
+
+1. Start with [Getting started](/docs/otel/getting-started).
+2. Read [Core](/docs/otel/core) to understand traces, metrics, logs, and exporters.
+3. Add [Flutter](/docs/otel/flutter) or [Dio](/docs/otel/dio) depending on your runtime shape.
+
+<Cards>
+  <Card title="Getting started" href="/docs/otel/getting-started" description="Initialize the SDK, emit the first span and metric, and shut down cleanly." />
+  <Card title="Core" href="/docs/otel/core" description="Understand the SDK architecture, propagation, metrics, logs, and exporters." />
+  <Card title="Flutter" href="/docs/otel/flutter" description="Instrument navigation, lifecycle, startup, performance, interactions, and errors." />
+  <Card title="Dio" href="/docs/otel/dio" description="Create HTTP client spans and propagate context into outbound requests." />
+</Cards>

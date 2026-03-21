@@ -1,0 +1,38 @@
+---
+title: Navigation
+description: Emit route spans and screen-ready spans through OtelNavigatorObserver.
+---
+
+# Navigation
+
+`OtelNavigatorObserver` tracks route transitions through Flutter navigation.
+
+## Wiring
+
+```dart
+MaterialApp(
+  navigatorObservers: <NavigatorObserver>[
+    if (flutterTelemetry.navigatorObserver != null)
+      flutterTelemetry.navigatorObserver!,
+  ],
+)
+```
+
+## What it records
+
+- route push spans
+- route pop, remove, and replace lifecycle
+- optional screen-ready spans
+
+Common attributes include:
+
+- `flutter.navigation.action`
+- `flutter.route.name`
+- `flutter.route.runtime_type`
+- `flutter.previous_route.name`
+
+## Naming
+
+The default route span name follows the configured prefix, such as `flutter.route <routeName>`.
+
+Use `routeSpanNamePrefix` and `screenReadySpanNamePrefix` when you need a different naming convention.

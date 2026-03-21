@@ -1,0 +1,52 @@
+---
+title: Metrics
+description: Create counters, histograms, and observable instruments with Meter and understand reader behavior.
+---
+
+# Metrics
+
+Metrics are built around `Meter` and its instruments.
+
+## Synchronous instruments
+
+```dart
+final requests = Otel.instance.meter.createIntCounter('requests.total');
+final queueDepth = Otel.instance.meter.createIntUpDownCounter('queue.depth');
+
+requests.add(1, attributes: const {'route': '/user'});
+queueDepth.add(-1, attributes: const {'queue': 'primary'});
+```
+
+## Histograms
+
+```dart
+final latency = Otel.instance.meter.createDoubleHistogram('http.client.duration');
+
+latency.record(42.5, attributes: const {'route': '/user'});
+```
+
+Use histograms for duration and size distributions, not for simple event counts.
+
+## Observable instruments
+
+```dart
+Otel.instance.meter.createObservableGauge(
+  'memory.usage.mb',
+  callback: () async => 128.0,
+);
+```
+
+Observable instruments are polled by metric readers rather than updated inline by application code.
+
+## Cardinality
+
+The SDK applies a metric cardinality limit and routes excess attribute combinations into an overflow series.
+
+Plan attributes carefully. High-cardinality values like raw user IDs are usually a bad fit for metrics.
+
+## Good practice
+
+- counters for monotonic totals
+- up-down counters for quantities that rise and fall
+- histograms for durations and sizes
+- observables for periodically sampled state

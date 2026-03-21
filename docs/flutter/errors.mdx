@@ -1,0 +1,32 @@
+---
+title: Error capture
+description: Capture Flutter framework and dispatcher errors and enrich them with breadcrumbs from recent app activity.
+---
+
+# Error capture
+
+`comon_otel_flutter` can instrument both major Flutter error entrypoints:
+
+- `FlutterError.onError`
+- `PlatformDispatcher.instance.onError`
+
+## What happens on capture
+
+Each captured error can be recorded as:
+
+- a span event with exception details
+- an error log with attributes
+- breadcrumb-enriched context from recent navigation, lifecycle, and interaction activity
+
+## Breadcrumbs
+
+Breadcrumbs are short recent context items that help explain what happened before a failure.
+
+Control them with:
+
+- `trackBreadcrumbs`
+- `breadcrumbCapacity`
+
+## Good practice
+
+Keep existing app error handlers in place when they still have useful behavior. The instrumentation is designed to chain rather than replace error handling outright.

@@ -1,0 +1,84 @@
+---
+title: Getting started
+description: Initialize Otel, emit traces, metrics, and logs, then shut the SDK down correctly.
+---
+
+# Getting started
+
+The smallest useful setup is:
+
+1. add `comon_otel`
+2. call `await Otel.init(...)`
+3. emit a span, metric, or log
+4. flush or shut down on process exit
+
+## Install the core package
+
+```bash
+dart pub add comon_otel
+```
+
+For Flutter the dependency command is the same:
+
+```bash
+flutter pub add comon_otel
+```
+
+## Minimal bootstrap
+
+```dart
+import 'package:comon_otel/comon_otel.dart';
+
+Future<void> main() async {
+  await Otel.init(
+    serviceName: 'my-app',
+    exporter: OtelExporter.console,
+  );
+
+  final requests = Otel.instance.meter.createIntCounter('requests.total');
+
+  final userId = await Otel.instance.tracer.traceAsync<String>(
+    'load-user',
+    fn: () async {
+      requests.add(1, attributes: const <String, Object>{'route': '/user'});
+      Otel.instance.logger.info('Loading user');
+      return '42';
+    },
+  );
+
+  print('Loaded user: $userId');
+  await Otel.shutdown();
+}
+```
+
+## What `Otel.init()` does
+
+- creates the global tracer, meter, and logger providers
+- configures exporters and processors
+- installs a default propagator
+- builds a `Resource` with service metadata
+
+## Common first options
+
+| Option | Purpose |
+| --- | --- |
+| `serviceName` | Resource service name |
+| `exporter` | Preset exporter type such as `console` or `otlpHttp` |
+| `endpoint` | Shared OTLP endpoint |
+| `sampler` | Sampling strategy |
+| `resource` / `resourceAttributes` | Additional resource metadata |
+
+## Clean shutdown
+
+Use `forceFlush()` before a short-lived process exits unexpectedly early. Use `shutdown()` during normal termination.
+
+```dart
+await Otel.forceFlush();
+await Otel.shutdown();
+```
+
+## Next steps
+
+- Read [Core](/docs/otel/core) for traces, metrics, logs, propagation, and exporters.
+- Read [Flutter](/docs/otel/flutter) for app-side instrumentation.
+- Read [Dio](/docs/otel/dio) if you use Dio as an HTTP client.

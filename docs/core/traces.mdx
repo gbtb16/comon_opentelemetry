@@ -1,0 +1,65 @@
+---
+title: Traces
+description: Create spans, manage span lifecycle, use helpers for sync or async work, and propagate context across operations.
+---
+
+# Traces
+
+Tracing is built around `Tracer`, `Span`, and `SpanContext`.
+
+## Start a span manually
+
+```dart
+final span = Otel.instance.tracer.startSpan('load-user');
+
+try {
+  span.setAttribute('user.id', '42');
+  span.addEvent('user-cache-miss');
+} catch (error, stackTrace) {
+  span.recordException(error, stackTrace: stackTrace);
+  span.setStatus(SpanStatus.error, description: 'load failed');
+  rethrow;
+} finally {
+  span.end();
+}
+```
+
+## Prefer helpers for common work
+
+```dart
+await Otel.instance.tracer.traceAsync(
+  'load-user',
+  fn: () async {
+    return fetchUser();
+  },
+);
+```
+
+Helpers are easier to audit because they auto-end spans and apply consistent error handling.
+
+## Context propagation
+
+The SDK keeps active span and baggage in `OtelContext`.
+
+```dart
+final carrier = <String, String>{};
+
+await Otel.instance.tracer.traceAsync('request', fn: () async {
+  const W3CTraceContextPropagator().inject(OtelContext.current, carrier);
+});
+```
+
+The default init path installs a composite propagator with W3C trace-context and W3C baggage.
+
+## Sampling
+
+Sampling is decided when the root span is created. Child spans follow the parent sampling decision.
+
+Use an explicit sampler when you need stricter production control.
+
+## Good practice
+
+- use stable operation names
+- add meaningful attributes early
+- record exceptions on the span that owns the failed work
+- prefer helpers over manual span lifecycle unless you genuinely need low-level control

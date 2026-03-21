@@ -1,0 +1,10 @@
+{
+    "title": "OpenTelemetry",
+    "pages": [
+        "index",
+        "getting-started",
+        "core",
+        "flutter",
+        "dio"
+    ]
+}

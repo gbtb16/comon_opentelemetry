@@ -1,0 +1,51 @@
+---
+title: Core
+description: Understand the OpenTelemetry SDK architecture in comon_otel and how the main signal pipelines fit together.
+---
+
+# Core
+
+`comon_otel` exposes one public SDK entrypoint:
+
+```dart
+import 'package:comon_otel/comon_otel.dart';
+```
+
+## Main building blocks
+
+| Piece | Responsibility |
+| --- | --- |
+| `Otel` | Global gateway for initialization, access, flush, and shutdown |
+| `TracerProvider` / `Tracer` | Trace creation and span lifecycle |
+| `MeterProvider` / `Meter` | Metric instrument creation and readers |
+| `LoggerProvider` / `OtelLogger` | Structured logs and log processors |
+| `OtelContext` | Zone-based active span and baggage propagation |
+| `TextMapPropagator` | Header or carrier injection and extraction |
+| Exporters and processors | Delivery to console, OTLP, or in-memory sinks |
+
+## Global model
+
+After `await Otel.init(...)`, the SDK exposes:
+
+- `Otel.instance.tracer`
+- `Otel.instance.meter`
+- `Otel.instance.logger`
+
+Use these convenience getters when one app-wide SDK instance is enough.
+
+## What the core package covers already
+
+- traces
+- metrics
+- logs
+- W3C and B3 propagation
+- OTLP export
+- in-memory testing helpers
+- some environment-driven bootstrap via `OTEL_*`
+
+<Cards>
+  <Card title="Traces" href="/docs/otel/core/traces" description="Create spans, set attributes, record exceptions, and propagate active context." />
+  <Card title="Metrics" href="/docs/otel/core/metrics" description="Use counters, histograms, observable instruments, and metric readers." />
+  <Card title="Logs" href="/docs/otel/core/logs" description="Emit structured logs with severity and trace-aware context." />
+  <Card title="Exporters" href="/docs/otel/core/exporters" description="Choose console, in-memory, or OTLP transport strategies." />
+</Cards>

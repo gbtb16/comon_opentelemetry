@@ -1,0 +1,65 @@
+---
+title: Flutter
+description: Install Flutter instrumentation for navigation, lifecycle, startup, performance, interactions, and error capture.
+---
+
+# Flutter
+
+`comon_otel_flutter` instruments a Flutter app on top of the core SDK.
+
+## Installation order
+
+1. call `WidgetsFlutterBinding.ensureInitialized()`
+2. initialize `comon_otel`
+3. install Flutter instrumentation
+4. wire the returned navigator observer into `MaterialApp`
+
+## Minimal setup
+
+```dart
+import 'package:comon_otel/comon_otel.dart';
+import 'package:comon_otel_flutter/comon_otel_flutter.dart';
+import 'package:flutter/material.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Otel.init(
+    serviceName: 'shopping-app',
+    exporter: OtelExporter.console,
+  );
+
+  final flutterTelemetry = ComonOtelFlutter.install();
+
+  runApp(MyApp(flutterTelemetry: flutterTelemetry));
+}
+```
+
+## Main capabilities
+
+- route spans through `OtelNavigatorObserver`
+- lifecycle logs and duration metrics
+- startup spans and first-interaction tracking
+- frame timing, slow frames, jank frames, and UI stalls
+- Flutter and `PlatformDispatcher` error capture
+- breadcrumb collection for later error context
+
+## Configuration
+
+`ComonOtelFlutterConfig` lets you toggle major areas like:
+
+- `trackNavigatorRoutes`
+- `trackAppStartup`
+- `trackScreenReady`
+- `trackFrameTimings`
+- `trackUiStalls`
+- `trackBreadcrumbs`
+- `captureFlutterErrors`
+- `capturePlatformDispatcherErrors`
+
+<Cards>
+  <Card title="Navigation" href="/docs/otel/flutter/navigation" description="Track route transitions and screen-ready spans." />
+  <Card title="Lifecycle" href="/docs/otel/flutter/lifecycle" description="Observe app state transitions and duration metrics." />
+  <Card title="Performance" href="/docs/otel/flutter/performance" description="Track startup, frame timings, jank, and UI stalls." />
+  <Card title="Errors" href="/docs/otel/flutter/errors" description="Capture framework and dispatcher errors with breadcrumbs." />
+</Cards>

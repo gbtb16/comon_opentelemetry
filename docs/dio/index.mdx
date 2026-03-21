@@ -1,0 +1,63 @@
+---
+title: Dio
+description: Instrument outgoing Dio requests with client spans, trace-context propagation, and selected HTTP headers.
+---
+
+# Dio
+
+`comon_otel_dio` adds `OtelDioInterceptor` on top of `comon_otel`.
+
+## Minimal setup
+
+```dart
+import 'package:comon_otel/comon_otel.dart';
+import 'package:comon_otel_dio/comon_otel_dio.dart';
+import 'package:dio/dio.dart';
+
+Future<void> main() async {
+  await Otel.init(
+    serviceName: 'shopping-api-client',
+    exporter: OtelExporter.console,
+  );
+
+  final dio = Dio()
+    ..interceptors.add(OtelDioInterceptor());
+
+  await dio.get('https://example.com/users');
+  await Otel.shutdown();
+}
+```
+
+## What it does
+
+- creates one client span per request
+- injects the current trace context into outgoing headers
+- records common HTTP semantic attributes
+- maps `5xx` and transport failures to error span status
+- optionally captures selected request and response headers
+
+## Common tuning
+
+```dart
+final dio = Dio()
+  ..interceptors.add(
+    OtelDioInterceptor(
+      requestFilter: (options) => !options.path.startsWith('/health'),
+      spanNameBuilder: (options) => 'api ${options.method} ${options.uri.path}',
+      captureRequestHeaders: const <String>{'x-request-id'},
+      captureResponseHeaders: const <String>{'content-type', 'x-request-id'},
+    ),
+  );
+```
+
+## Redaction
+
+Sensitive headers are redacted by default when captured. That keeps the feature safer than blindly copying all outbound or inbound headers.
+
+## W3C propagation
+
+The interceptor relies on the SDK propagator installed during `Otel.init()`. In the default setup, that means W3C trace-context and baggage are injected automatically.
+
+## Practical rule
+
+Capture only the headers you truly need. Full header capture is usually noisy and often risky for privacy or secret handling.

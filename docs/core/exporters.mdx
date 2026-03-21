@@ -1,0 +1,59 @@
+---
+title: Exporters
+description: Choose between console, in-memory, and OTLP exporters and understand the main transport tradeoffs.
+---
+
+# Exporters
+
+The SDK supports several exporter families.
+
+## Preset choices through `Otel.init()`
+
+| Exporter | Use it for |
+| --- | --- |
+| `OtelExporter.console` | Local development and quick inspection |
+| `OtelExporter.otlpHttp` | OTLP over HTTP protobuf |
+| `OtelExporter.otlpHttpJson` | OTLP over HTTP JSON |
+| `OtelExporter.otlpGrpc` | OTLP over gRPC |
+
+## Console exporter
+
+```dart
+await Otel.init(
+  serviceName: 'my-app',
+  exporter: OtelExporter.console,
+);
+```
+
+Best for local development. Not a production delivery path.
+
+## OTLP over HTTP or gRPC
+
+```dart
+await Otel.init(
+  serviceName: 'my-app',
+  exporter: OtelExporter.otlpHttp,
+  endpoint: 'http://localhost:4318',
+);
+```
+
+Use per-signal endpoints, headers, timeouts, and compression overrides when your collector topology needs them.
+
+## In-memory exporters for tests
+
+```dart
+final helper = await OtelTestHelper.setup();
+
+await Otel.instance.tracer.traceAsync('test-operation', fn: () async {});
+await Otel.forceFlush();
+
+expect(helper.spanExporter.lastSpanNamed('test-operation'), isNotNull);
+```
+
+That is the fastest path for verifying instrumentation behavior without a running collector.
+
+## Practical rule
+
+- local development: console
+- tests: in-memory
+- real delivery: OTLP HTTP or gRPC

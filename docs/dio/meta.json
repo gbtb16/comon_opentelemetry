@@ -1,0 +1,8 @@
+{
+    "title": "Dio",
+    "description": "HTTP client spans and propagation.",
+    "root": true,
+    "pages": [
+        "index"
+    ]
+}

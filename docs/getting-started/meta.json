@@ -1,0 +1,8 @@
+{
+    "title": "Getting started",
+    "description": "Bootstrap the SDK and emit the first signal.",
+    "root": true,
+    "pages": [
+        "index"
+    ]
+}

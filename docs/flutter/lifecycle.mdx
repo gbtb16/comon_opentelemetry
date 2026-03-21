@@ -1,0 +1,27 @@
+---
+title: Lifecycle
+description: Observe Flutter app lifecycle transitions and duration metrics for foreground and background time.
+---
+
+# Lifecycle
+
+Lifecycle instrumentation observes `AppLifecycleState` transitions through a binding observer.
+
+## What it emits
+
+- lifecycle logs for resumed, paused, inactive, and detached states
+- foreground duration metrics
+- background duration metrics
+- memory pressure count metrics
+
+## Why it matters
+
+Lifecycle telemetry is useful when:
+
+- startup performance differs after resume
+- crashes or stalls happen near background or foreground transitions
+- you want to correlate user-visible app states with backend requests or route transitions
+
+## Control
+
+Use `observeAppLifecycle` in `ComonOtelFlutterConfig` to enable or disable this instrumentation.

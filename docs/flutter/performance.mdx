@@ -1,0 +1,41 @@
+---
+title: Performance
+description: Track startup, frame timings, slow frames, jank, and UI stalls in Flutter apps.
+---
+
+# Performance
+
+Performance instrumentation covers startup and rendering responsiveness.
+
+## Startup
+
+Startup tracking creates spans for the app launch path and can mark first-frame or first-interaction milestones.
+
+## Frame timings
+
+The package can emit metrics for:
+
+- total frame duration
+- build duration
+- raster duration
+- slow frame count
+- jank frame count
+
+Control thresholds with:
+
+- `slowFrameThreshold`
+- `jankFrameThreshold`
+
+## UI stalls
+
+The UI stall observer uses a heuristic event-loop check to detect long stalls.
+
+Control this with:
+
+- `trackUiStalls`
+- `uiStallThreshold`
+- `uiStallCheckInterval`
+
+## Practical note
+
+Frame timing and UI stall instrumentation are useful, but they are not free. Keep them enabled deliberately in environments where the signal is worth the extra runtime work.

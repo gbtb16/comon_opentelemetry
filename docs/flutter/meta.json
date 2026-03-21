@@ -1,0 +1,12 @@
+{
+    "title": "Flutter",
+    "description": "App-side Flutter instrumentation.",
+    "root": true,
+    "pages": [
+        "index",
+        "navigation",
+        "lifecycle",
+        "performance",
+        "errors"
+    ]
+}

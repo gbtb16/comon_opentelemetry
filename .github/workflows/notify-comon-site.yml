@@ -1,0 +1,22 @@
+name: Notify comon_site
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch docs update event
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.COMON_SITE_REPO_DISPATCH_TOKEN }}
+          repository: serezhia/comon_site
+          event-type: docs-updated
+          client-payload: >-
+            {"repo":"comon_opentelemetry","ref":"${{ github.ref_name }}","sha":"${{ github.sha }}"}

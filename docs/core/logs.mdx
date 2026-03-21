@@ -1,0 +1,60 @@
+---
+title: Logs
+description: Emit structured OpenTelemetry logs with severity, attributes, and trace-aware context.
+---
+
+# Logs
+
+`OtelLogger` emits structured log records inside the same SDK.
+
+## Basic usage
+
+```dart
+Otel.instance.logger.info(
+  'Loading user',
+  attributes: const {
+    'user.id': '42',
+    'cache.hit': false,
+  },
+);
+```
+
+## Error logging
+
+```dart
+try {
+  await fetchUser();
+} catch (error, stackTrace) {
+  Otel.instance.logger.error(
+    'User load failed',
+    exception: error,
+    stackTrace: stackTrace,
+    attributes: const {'route': '/user'},
+  );
+}
+```
+
+## Severity levels
+
+The core package includes severities such as:
+
+- `TRACE`
+- `DEBUG`
+- `INFO`
+- `WARN`
+- `ERROR`
+- `FATAL`
+
+## Relation to traces
+
+When a log is emitted inside an active span context, trace and span identifiers can be attached automatically through the provider pipeline.
+
+That makes logs and spans easier to correlate downstream.
+
+## When to log vs trace
+
+- traces: lifecycle of an operation
+- logs: noteworthy events inside or outside an operation
+- metrics: aggregate behavior over time
+
+Use all three together rather than forcing one signal type to do every job.

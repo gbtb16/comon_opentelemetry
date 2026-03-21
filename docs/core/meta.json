@@ -1,0 +1,12 @@
+{
+    "title": "Core",
+    "description": "SDK architecture and signal model.",
+    "root": true,
+    "pages": [
+        "index",
+        "traces",
+        "metrics",
+        "logs",
+        "exporters"
+    ]
+}
