@@ -29,6 +29,11 @@ comon_otel
 
 `comon_otel` is the shared foundation. The Flutter and Dio packages add instrumentation on top of the same tracer, meter, logger, context, and propagator model.
 
+The wider `comon` ecosystem also exposes companion bridge packages in neighboring workspaces:
+
+- [Logger OpenTelemetry](/docs/logger/otel) for exporting `comon_logger` records into the same OTel pipeline
+- [ORM OpenTelemetry](/docs/orm/otel) for database spans and metrics on top of `comon_orm`
+
 ## What this workspace gives you
 
 - one async bootstrap path through `Otel.init()`
@@ -43,6 +48,7 @@ comon_otel
 1. Start with [Getting started](/docs/otel/getting-started).
 2. Read [Core](/docs/otel/core) to understand traces, metrics, logs, and exporters.
 3. Add [Flutter](/docs/otel/flutter) or [Dio](/docs/otel/dio) depending on your runtime shape.
+4. Add [Logger OpenTelemetry](/docs/logger/otel) or [ORM OpenTelemetry](/docs/orm/otel) when adjacent `comon` packages should emit into the same backend.
 
 <Cards>
   <Card title="Getting started" href="/docs/otel/getting-started" description="Initialize the SDK, emit the first span and metric, and shut down cleanly." />
