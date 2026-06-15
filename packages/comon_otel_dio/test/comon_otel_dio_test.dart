@@ -54,7 +54,7 @@ void main() {
       span.attributes[SemanticAttributes.httpUrl],
       'https://example.com/users',
     );
-    expect(span.attributes[SemanticAttributes.httpRoute], '/users');
+    expect(span.attributes.containsKey(SemanticAttributes.httpRoute), isFalse);
     expect(span.attributes[SemanticAttributes.httpStatusCode], 200);
     expect(span.status, SpanStatus.ok);
   });
@@ -248,17 +248,25 @@ void main() {
     });
     await Otel.forceFlush();
 
-    final spansByRoute = <String, SpanData>{
+    final spansByUrl = <String, SpanData>{
       for (final span in spanExporter.spans)
-        span.attributes[SemanticAttributes.httpRoute]! as String: span,
+        span.attributes[SemanticAttributes.httpUrl]! as String: span,
     };
-    expect(spansByRoute.keys, containsAll(<String>['/slow', '/fast']));
     expect(
-      spansByRoute['/slow']?.attributes[SemanticAttributes.httpUrl],
+      spansByUrl.keys,
+      containsAll(<String>[
+        'https://example.com/slow',
+        'https://example.com/fast',
+      ]),
+    );
+    expect(
+      spansByUrl['https://example.com/slow']
+          ?.attributes[SemanticAttributes.httpUrl],
       'https://example.com/slow',
     );
     expect(
-      spansByRoute['/fast']?.attributes[SemanticAttributes.httpUrl],
+      spansByUrl['https://example.com/fast']
+          ?.attributes[SemanticAttributes.httpUrl],
       'https://example.com/fast',
     );
   });
