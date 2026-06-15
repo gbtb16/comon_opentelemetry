@@ -62,6 +62,25 @@ class MyApp extends StatelessWidget {
 }
 ```
 
+## Mobile init recommendations
+
+On Flutter mobile, environment variables do not reach the SDK, so enable
+batching and periodic metric export explicitly:
+
+    await Otel.init(
+      serviceName: 'my-app',
+      exporter: OtelExporter.otlpHttpJson,
+      tracesEndpoint: 'https://collector.example.com/otel/http/v1/traces',
+      // ...per-signal endpoints + auth headers...
+      useBatchSpanProcessor: true,
+      useBatchLogProcessor: true,
+      usePeriodicMetricReader: true,
+      metricExportInterval: const Duration(seconds: 60),
+    );
+
+Without `usePeriodicMetricReader: true`, metrics are only exported on
+`forceFlush()` (e.g. on app background) and never on a timer.
+
 ## Configuration
 
 `ComonOtelFlutterConfig` controls which signals are active and how they are

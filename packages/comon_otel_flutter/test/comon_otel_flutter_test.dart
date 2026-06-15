@@ -6,6 +6,25 @@ import 'package:comon_otel_flutter/src/navigation/otel_flutter_route_context.dar
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+final class _CountingSpanExporter implements SpanExporter {
+  int forceFlushCount = 0;
+  final List<SpanData> spans = <SpanData>[];
+
+  @override
+  Future<ExportResult> export(List<SpanData> data) async {
+    spans.addAll(data);
+    return ExportResult.success;
+  }
+
+  @override
+  Future<void> forceFlush() async {
+    forceFlushCount += 1;
+  }
+
+  @override
+  Future<void> shutdown() async {}
+}
+
 void main() {
   late InMemorySpanExporter spanExporter;
   late InMemoryMetricExporter metricExporter;
@@ -117,6 +136,29 @@ void main() {
     expect(log.body, 'app.lifecycle');
     expect(log.attributes['flutter.lifecycle.state'], 'resumed');
     expect(log.attributes[SemanticAttributes.appLifecycleState], 'resumed');
+  });
+
+  test('flushes telemetry when the app is backgrounded', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final exporter = _CountingSpanExporter();
+    await Otel.shutdown();
+    await Otel.init(
+      serviceName: 'lifecycle-test',
+      spanProcessors: <SpanProcessor>[SimpleSpanProcessor(exporter)],
+      metricReaders: const <MetricReader>[],
+      logProcessors: const <LogProcessor>[],
+    );
+
+    final observer = OtelFlutterBindingObserver();
+    observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    observer.didChangeAppLifecycleState(AppLifecycleState.paused);
+
+    // Let the unawaited forceFlush microtask run.
+    await Future<void>.delayed(Duration.zero);
+
+    expect(exporter.forceFlushCount, greaterThanOrEqualTo(1));
+
+    await Otel.shutdown();
   });
 
   test('breadcrumbs keep only the configured tail', () {

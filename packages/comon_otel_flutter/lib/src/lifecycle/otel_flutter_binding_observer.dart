@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:comon_otel/comon_otel.dart';
 import 'package:flutter/widgets.dart';
 
@@ -117,7 +119,19 @@ final class OtelFlutterBindingObserver with WidgetsBindingObserver {
       }
     }
 
+    if (Otel.isInitialized && _isBackgrounding(state)) {
+      // The only reliable point to drain the in-memory queue before the OS
+      // suspends or kills the process.
+      unawaited(Otel.forceFlush());
+    }
+
     _lastLifecycleState = state;
+  }
+
+  bool _isBackgrounding(AppLifecycleState state) {
+    return state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden;
   }
 
   @override
