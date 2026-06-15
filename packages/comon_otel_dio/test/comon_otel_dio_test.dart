@@ -341,6 +341,21 @@ void main() {
     },
   );
 
+  test('request proceeds even when instrumentation throws', () async {
+    final dio = Dio()
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        return ResponseBody.fromString('ok', 200);
+      })
+      ..interceptors.add(
+        OtelDioInterceptor(
+          spanNameBuilder: (_) => throw StateError('instrumentation boom'),
+        ),
+      );
+
+    final response = await dio.get<dynamic>('https://example.com/users');
+    expect(response.statusCode, 200);
+  });
+
   test('records method_original for non-standard methods', () async {
     final dio = Dio()
       ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
