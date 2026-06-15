@@ -77,26 +77,32 @@ final class BatchLogProcessor implements LogProcessor {
 
   Future<void> _flushBatch({bool all = false}) {
     _pendingFlush = _pendingFlush.then((_) async {
-      if (_queue.isEmpty) {
-        return;
-      }
-
-      do {
-        final batch = <LogRecord>[];
-        final limit = all ? _queue.length : maxBatchSize;
-        while (_queue.isNotEmpty && batch.length < limit) {
-          batch.add(_queue.removeFirst());
+      try {
+        if (_queue.isEmpty) {
+          return;
         }
 
-        if (batch.isNotEmpty) {
-          final exportFuture = _exporter.export(batch);
-          if (exportTimeout == null) {
-            await exportFuture;
-          } else {
-            await exportFuture.timeout(exportTimeout!);
+        do {
+          final batch = <LogRecord>[];
+          final limit = all ? _queue.length : maxBatchSize;
+          while (_queue.isNotEmpty && batch.length < limit) {
+            batch.add(_queue.removeFirst());
           }
-        }
-      } while (all && _queue.isNotEmpty);
+
+          if (batch.isNotEmpty) {
+            final exportFuture = _exporter.export(batch);
+            if (exportTimeout == null) {
+              await exportFuture;
+            } else {
+              await exportFuture.timeout(exportTimeout!);
+            }
+          }
+        } while (all && _queue.isNotEmpty);
+      } catch (_) {
+        // Swallow export failures so the flush chain never becomes a
+        // permanently-rejected Future. SDK-level error reporting is tracked
+        // separately (F2.2, out of scope here).
+      }
     });
 
     return _pendingFlush;

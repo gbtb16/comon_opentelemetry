@@ -213,6 +213,48 @@ final class _FailingLogExporter implements LogExporter {
   Future<void> shutdown() async {}
 }
 
+final class _ThrowOnceSpanExporter implements SpanExporter {
+  int exportCalls = 0;
+  final List<SpanData> exported = <SpanData>[];
+
+  @override
+  Future<ExportResult> export(List<SpanData> spans) async {
+    exportCalls += 1;
+    if (exportCalls == 1) {
+      throw TimeoutException('simulated export timeout');
+    }
+    exported.addAll(spans);
+    return ExportResult.success;
+  }
+
+  @override
+  Future<void> forceFlush() async {}
+
+  @override
+  Future<void> shutdown() async {}
+}
+
+final class _ThrowOnceLogExporter implements LogExporter {
+  int exportCalls = 0;
+  final List<LogRecord> exported = <LogRecord>[];
+
+  @override
+  Future<ExportResult> export(List<LogRecord> logs) async {
+    exportCalls += 1;
+    if (exportCalls == 1) {
+      throw TimeoutException('simulated export timeout');
+    }
+    exported.addAll(logs);
+    return ExportResult.success;
+  }
+
+  @override
+  Future<void> forceFlush() async {}
+
+  @override
+  Future<void> shutdown() async {}
+}
+
 final class _StaticResourceDetector implements ResourceDetector {
   const _StaticResourceDetector(this.attributes);
 

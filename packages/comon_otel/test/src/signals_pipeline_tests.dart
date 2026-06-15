@@ -364,5 +364,67 @@ void defineSignalsPipelineTests() {
 
       expect(periodicExporter.lastMetricNamed('periodic.count'), isNotNull);
     });
+
+    test('batch span processor recovers after a flush export throws', () async {
+      final throwingExporter = _ThrowOnceSpanExporter();
+      final processor = BatchSpanProcessor(
+        exporter: throwingExporter,
+        maxBatchSize: 1000,
+        scheduleDelay: const Duration(minutes: 1),
+      );
+
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'test-service',
+        spanProcessors: <SpanProcessor>[processor],
+        metricReaders: <MetricReader>[
+          ExportingMetricReader(exporter: metricExporter),
+        ],
+        logProcessors: <LogProcessor>[SimpleLogProcessor(logExporter)],
+      );
+
+      await Otel.instance.tracer.traceAsync('first-span', fn: () async {});
+      // First flush hits the throwing export; the fix must swallow it so the
+      // chain stays alive.
+      await processor.forceFlush().catchError((_) {});
+
+      await Otel.instance.tracer.traceAsync('second-span', fn: () async {});
+      await processor.forceFlush();
+
+      expect(
+        throwingExporter.exported.any((span) => span.name == 'second-span'),
+        isTrue,
+      );
+    });
+
+    test('batch log processor recovers after a flush export throws', () async {
+      final throwingExporter = _ThrowOnceLogExporter();
+      final processor = BatchLogProcessor(
+        exporter: throwingExporter,
+        maxBatchSize: 1000,
+        scheduleDelay: const Duration(minutes: 1),
+      );
+
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'test-service',
+        spanProcessors: <SpanProcessor>[SimpleSpanProcessor(exporter)],
+        metricReaders: <MetricReader>[
+          ExportingMetricReader(exporter: metricExporter),
+        ],
+        logProcessors: <LogProcessor>[processor],
+      );
+
+      Otel.instance.logger.info('first-log');
+      await processor.forceFlush().catchError((_) {});
+
+      Otel.instance.logger.info('second-log');
+      await processor.forceFlush();
+
+      expect(
+        throwingExporter.exported.any((log) => log.body == 'second-log'),
+        isTrue,
+      );
+    });
   });
 }
