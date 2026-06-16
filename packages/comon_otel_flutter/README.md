@@ -62,55 +62,85 @@ class MyApp extends StatelessWidget {
 }
 ```
 
-## Mobile init recommendations
+## Mobile (go-live) initialization
 
-On Flutter mobile, environment variables do not reach the SDK, so enable
-batching and periodic metric export explicitly:
+On Flutter mobile, environment variables do not reach the SDK, so the
+transport, batching, metric-reader, and resource settings must be passed to
+`Otel.init` explicitly. Two wiring facts drive the shape of a production
+config:
 
-    await Otel.init(
-      serviceName: 'my-app',
-      exporter: OtelExporter.otlpHttpJson,
-      tracesEndpoint: 'https://collector.example.com/otel/http/v1/traces',
-      // ...per-signal endpoints + auth headers...
-      useBatchSpanProcessor: true,
-      useBatchLogProcessor: true,
-      usePeriodicMetricReader: true,
-      metricExportInterval: const Duration(seconds: 60),
-    );
+- **`spanProcessors:` / `metricReaders:` / `logProcessors:` are replace, not
+  additive.** Pass one and the SDK uses that list verbatim, skipping the
+  exporter/batch convenience knobs **for that signal only** — the other
+  signals still honor their knobs (`exporter`, the per-signal endpoints,
+  `useBatchLogProcessor`, `usePeriodicMetricReader`, …).
+- **Screen↔HTTP correlation needs `OtelFlutterScreenSpanProcessor`, and
+  `ComonOtelFlutter.install` does not auto-register it.** So you must own the
+  span pipeline: build the span exporter yourself and list the screen
+  processor alongside a `BatchSpanProcessor`. Metrics and logs can stay on the
+  convenience knobs.
+
+`host.name` is the device host name (e.g. "iPhone de João") — PII. On mobile,
+omit `HostResourceDetector` and supply non-PII device attributes via
+`detectMobileResourceAttributes()` instead (it returns `os.*`, `device.*`, and
+`service.version`).
+
+```dart
+import 'package:comon_otel/comon_otel.dart';
+import 'package:comon_otel_flutter/comon_otel_flutter.dart';
+
+const collector = 'https://collector.example.com/otel/http/v1';
+final authHeaders = <String, String>{'authorization': 'Bearer <token>'};
+
+// Non-PII device/app attributes (os.*, device.*, service.version).
+final resourceAttributes = await detectMobileResourceAttributes();
+
+await Otel.init(
+  serviceName: 'my-app',
+  exporter: OtelExporter.otlpHttpJson,
+
+  // Spans: you own the pipeline because correlation needs the screen
+  // processor. Passing spanProcessors replaces the auto-wired span exporter,
+  // so construct it explicitly here (the exporter/tracesEndpoint knobs no
+  // longer feed spans once this list is set).
+  spanProcessors: <SpanProcessor>[
+    OtelFlutterScreenSpanProcessor(),
+    BatchSpanProcessor(
+      exporter: OtlpHttpJsonSpanExporter(
+        endpoint: '$collector/traces',
+        headers: authHeaders,
+      ),
+    ),
+  ],
+
+  // Metrics + logs: keep the convenience knobs. These lists are left unset,
+  // so the SDK auto-wires their exporters from the endpoints/headers below.
+  metricsEndpoint: '$collector/metrics',
+  logsEndpoint: '$collector/logs',
+  otlpMetricsHeaders: authHeaders,
+  otlpLogsHeaders: authHeaders,
+  useBatchLogProcessor: true,
+  usePeriodicMetricReader: true,
+  metricExportInterval: const Duration(seconds: 60),
+
+  // PII-safe resource: omit HostResourceDetector; supply device attributes.
+  // resourceAttributes already carries service.version, so it is not passed
+  // separately.
+  resourceAttributes: resourceAttributes,
+  resourceDetectors: const <ResourceDetector>[
+    ProcessResourceDetector(),
+    TelemetrySdkResourceDetector(),
+  ],
+);
+```
 
 Without `usePeriodicMetricReader: true`, metrics are only exported on
 `forceFlush()` (e.g. on app background) and never on a timer.
 
-## Resource & PII on mobile
-
-`host.name` is the device host name (e.g. "iPhone de João") — PII. On
-mobile, omit `HostResourceDetector` and supply device attributes instead:
-
-    final resourceAttributes = await detectMobileResourceAttributes();
-    await Otel.init(
-      serviceName: 'my-app',
-      serviceVersion: resourceAttributes['service.version'] as String?,
-      resourceAttributes: resourceAttributes,
-      resourceDetectors: const <ResourceDetector>[
-        ProcessResourceDetector(),
-        TelemetrySdkResourceDetector(),
-      ],
-      // ...
-    );
-
-To correlate HTTP and interaction spans with the active screen, add the
-screen span processor to your processors (alongside your exporter
-processor):
-
-    spanProcessors: <SpanProcessor>[
-      OtelFlutterScreenSpanProcessor(),
-      BatchSpanProcessor(exporter: mySpanExporter),
-    ],
-
-The processor runs in the shared core pipeline, so it stamps `screen.name`
-(and `flutter.route.name`) onto every span at start time — including Dio
-HTTP spans created in `comon_otel_dio`, which has no dependency on this
-package.
+`OtelFlutterScreenSpanProcessor` runs in the shared core pipeline, so it stamps
+`screen.name` (and `flutter.route.name`) onto every span at start time —
+including Dio HTTP spans created in `comon_otel_dio`, which has no dependency
+on this package.
 
 ## Configuration
 
