@@ -212,8 +212,7 @@ final class OtelNavigatorObserver extends NavigatorObserver {
       if (segment.isEmpty) {
         return segment;
       }
-      if (_numericSegment.hasMatch(segment) ||
-          _uuidSegment.hasMatch(segment)) {
+      if (_numericSegment.hasMatch(segment) || _uuidSegment.hasMatch(segment)) {
         return ':id';
       }
       return segment;

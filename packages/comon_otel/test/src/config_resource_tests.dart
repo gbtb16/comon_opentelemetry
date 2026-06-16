@@ -210,30 +210,39 @@ void defineConfigAndResourceTests() {
       },
     );
 
-    test('init exposes batch and metric-reader configuration explicitly', () async {
-      await Otel.shutdown();
-      await Otel.init(
-        serviceName: 'test-service',
-        useBatchSpanProcessor: true,
-        batchSpanProcessorScheduleDelay: const Duration(seconds: 2),
-        batchSpanProcessorMaxQueueSize: 128,
-        batchSpanProcessorMaxExportBatchSize: 64,
-        useBatchLogProcessor: true,
-        batchLogProcessorScheduleDelay: const Duration(seconds: 3),
-        usePeriodicMetricReader: true,
-        metricExportInterval: const Duration(seconds: 30),
-      );
+    test(
+      'init exposes batch and metric-reader configuration explicitly',
+      () async {
+        await Otel.shutdown();
+        await Otel.init(
+          serviceName: 'test-service',
+          useBatchSpanProcessor: true,
+          batchSpanProcessorScheduleDelay: const Duration(seconds: 2),
+          batchSpanProcessorMaxQueueSize: 128,
+          batchSpanProcessorMaxExportBatchSize: 64,
+          useBatchLogProcessor: true,
+          batchLogProcessorScheduleDelay: const Duration(seconds: 3),
+          usePeriodicMetricReader: true,
+          metricExportInterval: const Duration(seconds: 30),
+        );
 
-      final config = Otel.instance.config;
-      expect(config.useBatchSpanProcessor, isTrue);
-      expect(config.batchSpanProcessorScheduleDelay, const Duration(seconds: 2));
-      expect(config.batchSpanProcessorMaxQueueSize, 128);
-      expect(config.batchSpanProcessorMaxExportBatchSize, 64);
-      expect(config.useBatchLogProcessor, isTrue);
-      expect(config.batchLogProcessorScheduleDelay, const Duration(seconds: 3));
-      expect(config.usePeriodicMetricReader, isTrue);
-      expect(config.metricExportInterval, const Duration(seconds: 30));
-    });
+        final config = Otel.instance.config;
+        expect(config.useBatchSpanProcessor, isTrue);
+        expect(
+          config.batchSpanProcessorScheduleDelay,
+          const Duration(seconds: 2),
+        );
+        expect(config.batchSpanProcessorMaxQueueSize, 128);
+        expect(config.batchSpanProcessorMaxExportBatchSize, 64);
+        expect(config.useBatchLogProcessor, isTrue);
+        expect(
+          config.batchLogProcessorScheduleDelay,
+          const Duration(seconds: 3),
+        );
+        expect(config.usePeriodicMetricReader, isTrue);
+        expect(config.metricExportInterval, const Duration(seconds: 30));
+      },
+    );
 
     test('applies span limit env settings to runtime span behavior', () async {
       OtelEnvConfig.overrideEnvSource(
@@ -521,24 +530,27 @@ void defineConfigAndResourceTests() {
       },
     );
 
-    test('omitting HostResourceDetector keeps host.name out of the resource', () async {
-      await Otel.shutdown();
-      await Otel.init(
-        serviceName: 'pii-test',
-        serviceVersion: '1.2.3',
-        resourceDetectors: const <ResourceDetector>[
-          ProcessResourceDetector(),
-          TelemetrySdkResourceDetector(),
-        ],
-      );
+    test(
+      'omitting HostResourceDetector keeps host.name out of the resource',
+      () async {
+        await Otel.shutdown();
+        await Otel.init(
+          serviceName: 'pii-test',
+          serviceVersion: '1.2.3',
+          resourceDetectors: const <ResourceDetector>[
+            ProcessResourceDetector(),
+            TelemetrySdkResourceDetector(),
+          ],
+        );
 
-      final attributes = Otel.instance.tracerProvider.resource.attributes;
-      expect(attributes.containsKey('host.name'), isFalse);
-      expect(attributes['service.version'], '1.2.3');
-      expect(attributes['telemetry.sdk.name'], 'comon_otel');
-      expect(attributes['telemetry.sdk.language'], 'dart');
-      expect(attributes['telemetry.sdk.version'], isNotEmpty);
-    });
+        final attributes = Otel.instance.tracerProvider.resource.attributes;
+        expect(attributes.containsKey('host.name'), isFalse);
+        expect(attributes['service.version'], '1.2.3');
+        expect(attributes['telemetry.sdk.name'], 'comon_otel');
+        expect(attributes['telemetry.sdk.language'], 'dart');
+        expect(attributes['telemetry.sdk.version'], isNotEmpty);
+      },
+    );
 
     test('explicit serviceVersion wins over a detector emitting it', () {
       final resource = Resource.autoDetect(

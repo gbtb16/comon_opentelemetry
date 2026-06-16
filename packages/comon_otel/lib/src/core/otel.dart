@@ -230,8 +230,7 @@ final class Otel {
       batchSpanProcessorMaxExportBatchSize:
           batchSpanProcessorMaxExportBatchSize ??
           OtelEnvConfig.bspMaxExportBatchSize,
-      useBatchLogProcessor:
-          useBatchLogProcessor ?? OtelEnvConfig.hasBlrpConfig,
+      useBatchLogProcessor: useBatchLogProcessor ?? OtelEnvConfig.hasBlrpConfig,
       batchLogProcessorScheduleDelay:
           batchLogProcessorScheduleDelay ?? OtelEnvConfig.blrpScheduleDelay,
       batchLogProcessorExportTimeout:

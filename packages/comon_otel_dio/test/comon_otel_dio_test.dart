@@ -260,13 +260,13 @@ void main() {
       ]),
     );
     expect(
-      spansByUrl['https://example.com/slow']
-          ?.attributes[SemanticAttributes.httpUrl],
+      spansByUrl['https://example.com/slow']?.attributes[SemanticAttributes
+          .httpUrl],
       'https://example.com/slow',
     );
     expect(
-      spansByUrl['https://example.com/fast']
-          ?.attributes[SemanticAttributes.httpUrl],
+      spansByUrl['https://example.com/fast']?.attributes[SemanticAttributes
+          .httpUrl],
       'https://example.com/fast',
     );
   });
