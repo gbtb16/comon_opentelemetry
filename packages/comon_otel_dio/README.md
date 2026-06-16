@@ -59,7 +59,10 @@ final dio = Dio()
   ..interceptors.add(
     OtelDioInterceptor(
       requestFilter: (options) => !options.path.startsWith('/health'),
-      spanNameBuilder: (options) => 'api ${options.method} ${options.uri.path}',
+      // Keep span names low-cardinality: never bake a raw, unsanitized path
+      // (e.g. "/order/12345") into the name — that explodes spanmetrics in the
+      // collector. Use the method, or a sanitized/templated route only.
+      spanNameBuilder: (options) => 'api ${options.method}',
       captureRequestHeaders: const <String>{'x-request-id'},
       captureResponseHeaders: const <String>{'content-type', 'x-request-id'},
     ),
@@ -75,7 +78,6 @@ The interceptor records a focused HTTP client span model out of the box.
 | `http.request.method` | every request |
 | `http.request.method_original` | non-standard or non-canonical methods |
 | `url.full` | every request |
-| `http.route` | every request |
 | `server.address` / `server.port` | when host and port are available |
 | `network.protocol.name` | every request |
 | `http.request.body.size` | when request body size can be estimated |
