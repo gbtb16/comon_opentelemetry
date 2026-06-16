@@ -297,20 +297,23 @@ void main() {
     expect(logExporter.logs.last.body, 'app.memory_pressure');
   });
 
-  testWidgets('navigator observer records route spans', (tester) async {
+  testWidgets('navigation emits only a sanitized screen_ready span', (
+    tester,
+  ) async {
     final observer = OtelNavigatorObserver();
 
     await tester.pumpWidget(
       MaterialApp(
         navigatorObservers: <NavigatorObserver>[observer],
         routes: <String, WidgetBuilder>{
-          '/details': (_) => const Scaffold(body: Text('details')),
+          '/order/12345': (_) => const Scaffold(body: Text('order')),
         },
         home: Scaffold(
           body: Builder(
             builder: (context) {
               return TextButton(
-                onPressed: () => Navigator.of(context).pushNamed('/details'),
+                onPressed: () =>
+                    Navigator.of(context).pushNamed('/order/12345'),
                 child: const Text('go'),
               );
             },
@@ -320,19 +323,24 @@ void main() {
     );
 
     await tester.tap(find.text('go'));
-    await tester.pumpAndSettle();
-    Navigator.of(tester.element(find.text('details'))).pop();
-    await tester.pumpAndSettle();
+    await tester.pump(); // fires the post-frame callback that ends screen_ready
+    await tester.pump();
     await Otel.forceFlush();
 
-    final routeSpan = spanExporter.spans.singleWhere(
-      (span) => span.name == 'flutter.route /details',
+    final names = spanExporter.spans.map((span) => span.name).toList();
+    expect(names, contains('flutter.screen_ready /order/:id'));
+    expect(
+      names.any((name) => name.startsWith('flutter.route ')),
+      isFalse,
+      reason: 'umbrella route span must no longer be created',
     );
-    expect(routeSpan.attributes['flutter.route.name'], '/details');
-    expect(routeSpan.attributes[SemanticAttributes.flutterRoute], '/details');
-    expect(routeSpan.attributes['screen.name'], '/details');
-    expect(routeSpan.attributes['screen.class'], isNotNull);
-    expect(routeSpan.attributes['flutter.navigation.action'], 'push');
+    expect(
+      names.any((name) => name.contains('12345')),
+      isFalse,
+      reason: 'route names must be sanitized against cardinality',
+    );
+
+    observer.dispose();
   });
 
   testWidgets('navigator observer records screen-ready spans', (tester) async {
@@ -372,6 +380,8 @@ void main() {
     );
     expect(readySpan.attributes[SemanticAttributes.flutterRoute], '/details');
     expect(readySpan.attributes['screen.name'], '/details');
+    expect(readySpan.attributes['screen.class'], isNotNull);
+    expect(readySpan.attributes['flutter.navigation.action'], 'push');
   });
 
   test(
