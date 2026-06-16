@@ -244,6 +244,16 @@ void defineConfigAndResourceTests() {
       },
     );
 
+    test('default resource carries spec-mandatory telemetry.sdk attributes', () async {
+      await Otel.shutdown();
+      await Otel.init(serviceName: 'sdk-default-service');
+
+      final attributes = Otel.instance.tracerProvider.resource.attributes;
+      expect(attributes['telemetry.sdk.name'], 'comon_otel');
+      expect(attributes['telemetry.sdk.language'], 'dart');
+      expect(attributes['telemetry.sdk.version'], isNotEmpty);
+    });
+
     test('applies span limit env settings to runtime span behavior', () async {
       OtelEnvConfig.overrideEnvSource(
         () => <String, String>{

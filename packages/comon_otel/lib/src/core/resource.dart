@@ -60,6 +60,7 @@ final class Resource {
   static const List<ResourceDetector> defaultDetectors = <ResourceDetector>[
     ProcessResourceDetector(),
     HostResourceDetector(),
+    TelemetrySdkResourceDetector(),
   ];
 
   /// Platform-derived fallback service name.
