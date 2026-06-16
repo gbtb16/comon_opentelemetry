@@ -22,6 +22,9 @@ Map<String, Object> mobileResourceAttributesFrom({
       'device.model.identifier': deviceModelIdentifier,
     if (deviceManufacturer != null && deviceManufacturer.isNotEmpty)
       'device.manufacturer': deviceManufacturer,
+    // service.version is conditional: emitted only when a non-empty version is
+    // resolved. On a built app PackageInfo.version is always present; in tests
+    // or unusual hosts it may be empty, in which case the attribute is omitted.
     if (serviceVersion != null && serviceVersion.isNotEmpty)
       'service.version': serviceVersion,
   };
