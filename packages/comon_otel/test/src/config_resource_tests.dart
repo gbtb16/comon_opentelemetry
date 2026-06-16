@@ -244,15 +244,18 @@ void defineConfigAndResourceTests() {
       },
     );
 
-    test('default resource carries spec-mandatory telemetry.sdk attributes', () async {
-      await Otel.shutdown();
-      await Otel.init(serviceName: 'sdk-default-service');
+    test(
+      'default resource carries spec-mandatory telemetry.sdk attributes',
+      () async {
+        await Otel.shutdown();
+        await Otel.init(serviceName: 'sdk-default-service');
 
-      final attributes = Otel.instance.tracerProvider.resource.attributes;
-      expect(attributes['telemetry.sdk.name'], 'comon_otel');
-      expect(attributes['telemetry.sdk.language'], 'dart');
-      expect(attributes['telemetry.sdk.version'], isNotEmpty);
-    });
+        final attributes = Otel.instance.tracerProvider.resource.attributes;
+        expect(attributes['telemetry.sdk.name'], 'comon_otel');
+        expect(attributes['telemetry.sdk.language'], 'dart');
+        expect(attributes['telemetry.sdk.version'], isNotEmpty);
+      },
+    );
 
     test(
       'explicit batch/periodic init params drive batch behavior (no env)',

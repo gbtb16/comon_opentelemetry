@@ -982,14 +982,11 @@ void main() {
     expect(values.osVersion, '17.4');
     expect(values.modelId, 'iPhone15,2');
     expect(values.manufacturer, 'Apple');
-    expect(
-      <String>[
-        values.osName,
-        values.osVersion,
-        values.modelId,
-        values.manufacturer,
-      ],
-      isNot(contains(piiDeviceName)),
-    );
+    expect(<String>[
+      values.osName,
+      values.osVersion,
+      values.modelId,
+      values.manufacturer,
+    ], isNot(contains(piiDeviceName)));
   });
 }
