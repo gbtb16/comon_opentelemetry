@@ -154,7 +154,36 @@ void main() {
     expect(log.attributes[SemanticAttributes.appLifecycleState], 'resumed');
   });
 
-  test('flushes telemetry when the app is backgrounded', () async {
+  for (final state in <AppLifecycleState>[
+    AppLifecycleState.paused,
+    AppLifecycleState.detached,
+    AppLifecycleState.hidden,
+  ]) {
+    test('flushes telemetry when the app is backgrounded ($state)', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final exporter = _CountingSpanExporter();
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'lifecycle-test',
+        spanProcessors: <SpanProcessor>[SimpleSpanProcessor(exporter)],
+        metricReaders: const <MetricReader>[],
+        logProcessors: const <LogProcessor>[],
+      );
+
+      final observer = OtelFlutterBindingObserver();
+      observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      observer.didChangeAppLifecycleState(state);
+
+      // Let the unawaited forceFlush microtask run.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(exporter.forceFlushCount, greaterThanOrEqualTo(1));
+
+      await Otel.shutdown();
+    });
+  }
+
+  test('does not flush on non-backgrounding lifecycle states', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     final exporter = _CountingSpanExporter();
     await Otel.shutdown();
@@ -166,13 +195,13 @@ void main() {
     );
 
     final observer = OtelFlutterBindingObserver();
+    observer.didChangeAppLifecycleState(AppLifecycleState.inactive);
     observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
-    observer.didChangeAppLifecycleState(AppLifecycleState.paused);
 
-    // Let the unawaited forceFlush microtask run.
+    // Let any (unexpected) unawaited forceFlush microtask run.
     await Future<void>.delayed(Duration.zero);
 
-    expect(exporter.forceFlushCount, greaterThanOrEqualTo(1));
+    expect(exporter.forceFlushCount, 0);
 
     await Otel.shutdown();
   });

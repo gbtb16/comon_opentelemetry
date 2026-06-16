@@ -384,9 +384,9 @@ void defineSignalsPipelineTests() {
       );
 
       await Otel.instance.tracer.traceAsync('first-span', fn: () async {});
-      // First flush hits the throwing export; the fix must swallow it so the
-      // chain stays alive.
-      await processor.forceFlush().catchError((_) {});
+      // First flush hits the throwing export; the B1 fix swallows it so the
+      // chain stays alive and this flush resolves normally.
+      await processor.forceFlush();
 
       await Otel.instance.tracer.traceAsync('second-span', fn: () async {});
       await processor.forceFlush();
@@ -416,7 +416,9 @@ void defineSignalsPipelineTests() {
       );
 
       Otel.instance.logger.info('first-log');
-      await processor.forceFlush().catchError((_) {});
+      // The B1 fix swallows the throwing export, so this flush resolves
+      // normally.
+      await processor.forceFlush();
 
       Otel.instance.logger.info('second-log');
       await processor.forceFlush();

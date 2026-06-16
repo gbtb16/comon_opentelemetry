@@ -35,6 +35,8 @@ final class TelemetrySdkResourceDetector implements ResourceDetector {
 
   @override
   Map<String, Object> detect() {
+    // telemetry.sdk.version is hardcoded; keep it in sync with the package
+    // version in pubspec.yaml on every release bump.
     return const <String, Object>{
       'telemetry.sdk.name': 'comon_otel',
       'telemetry.sdk.language': 'dart',
@@ -106,6 +108,10 @@ final class Resource {
       detectedAttributes.addAll(detector.detect());
     }
     detectedAttributes.remove('service.name');
+    if (serviceVersion != null) {
+      // An explicit serviceVersion must win over any detector that emits one.
+      detectedAttributes.remove('service.version');
+    }
     if (environment != null) {
       detectedAttributes.remove('deployment.environment');
     }

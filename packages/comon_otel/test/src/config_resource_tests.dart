@@ -540,6 +540,20 @@ void defineConfigAndResourceTests() {
       expect(attributes['telemetry.sdk.version'], isNotEmpty);
     });
 
+    test('explicit serviceVersion wins over a detector emitting it', () {
+      final resource = Resource.autoDetect(
+        serviceName: 'svc',
+        serviceVersion: '2.0.0',
+        detectors: <ResourceDetector>[
+          _StaticResourceDetector(<String, Object>{
+            'service.version': 'detector-version',
+          }),
+        ],
+      );
+
+      expect(resource.attributes['service.version'], '2.0.0');
+    });
+
     test('preserves resource schemaUrl through bootstrap and merge', () {
       expect(Resource.empty().schemaUrl, isNull);
 
