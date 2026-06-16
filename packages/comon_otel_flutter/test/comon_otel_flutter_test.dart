@@ -2,7 +2,6 @@ import 'dart:ui';
 
 import 'package:comon_otel/comon_otel.dart';
 import 'package:comon_otel_flutter/comon_otel_flutter.dart';
-import 'package:comon_otel_flutter/src/navigation/otel_flutter_route_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -728,6 +727,108 @@ void main() {
     final breadcrumbs = OtelFlutterBreadcrumbs.serialize();
     expect(breadcrumbs, contains('tap checkout_button'));
   });
+
+  test('screen span processor stamps active screen onto spans', () async {
+    final exporter = InMemorySpanExporter();
+    await Otel.shutdown();
+    await Otel.init(
+      serviceName: 'stamp-test',
+      spanProcessors: <SpanProcessor>[
+        OtelFlutterScreenSpanProcessor(),
+        SimpleSpanProcessor(exporter),
+      ],
+      metricReaders: const <MetricReader>[],
+      logProcessors: const <LogProcessor>[],
+    );
+
+    OtelFlutterRouteContext.update(
+      routeName: '/checkout',
+      routeRuntimeType: 'CheckoutRoute',
+    );
+
+    await Otel.instance.tracer.traceAsync('http-call', fn: () async {});
+    await Otel.forceFlush();
+
+    final span = exporter.lastSpanNamed('http-call');
+    expect(span, isNotNull);
+    expect(span!.attributes['screen.name'], '/checkout');
+    expect(span.attributes['flutter.route.name'], '/checkout');
+
+    OtelFlutterRouteContext.clear();
+    await Otel.shutdown();
+  });
+
+  test(
+    'screen span processor never overwrites an explicit screen.name',
+    () async {
+      final exporter = InMemorySpanExporter();
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'stamp-guard-test',
+        spanProcessors: <SpanProcessor>[
+          OtelFlutterScreenSpanProcessor(),
+          SimpleSpanProcessor(exporter),
+        ],
+        metricReaders: const <MetricReader>[],
+        logProcessors: const <LogProcessor>[],
+      );
+
+      OtelFlutterRouteContext.update(
+        routeName: '/checkout',
+        routeRuntimeType: 'CheckoutRoute',
+      );
+
+      // The span is born with an explicit screen.name; onStart must not clobber
+      // it with the active route.
+      await Otel.instance.tracer.traceAsync(
+        'http-call',
+        attributes: const <String, Object>{'screen.name': '/explicit'},
+        fn: () async {},
+      );
+      await Otel.forceFlush();
+
+      final span = exporter.lastSpanNamed('http-call');
+      expect(span, isNotNull);
+      expect(span!.attributes['screen.name'], '/explicit');
+      // flutter.route.name was not set explicitly, so it is still stamped.
+      expect(span.attributes['flutter.route.name'], '/checkout');
+
+      OtelFlutterRouteContext.clear();
+      await Otel.shutdown();
+    },
+  );
+
+  test(
+    'screen span processor stamps nothing when no route is active',
+    () async {
+      final exporter = InMemorySpanExporter();
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'stamp-empty-test',
+        spanProcessors: <SpanProcessor>[
+          OtelFlutterScreenSpanProcessor(),
+          SimpleSpanProcessor(exporter),
+        ],
+        metricReaders: const <MetricReader>[],
+        logProcessors: const <LogProcessor>[],
+      );
+
+      OtelFlutterRouteContext.clear();
+
+      // With no active route context, onStart must early-return without
+      // throwing and leave the span unstamped.
+      await Otel.instance.tracer.traceAsync('http-call', fn: () async {});
+      await Otel.forceFlush();
+
+      final span = exporter.lastSpanNamed('http-call');
+      expect(span, isNotNull);
+      expect(span!.attributes.containsKey('screen.name'), isFalse);
+      expect(span.attributes.containsKey('flutter.route.name'), isFalse);
+
+      OtelFlutterRouteContext.clear();
+      await Otel.shutdown();
+    },
+  );
 
   test(
     'interaction helpers trace async form submissions and failures',

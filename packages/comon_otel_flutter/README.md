@@ -81,6 +81,20 @@ batching and periodic metric export explicitly:
 Without `usePeriodicMetricReader: true`, metrics are only exported on
 `forceFlush()` (e.g. on app background) and never on a timer.
 
+To correlate HTTP and interaction spans with the active screen, add the
+screen span processor to your processors (alongside your exporter
+processor):
+
+    spanProcessors: <SpanProcessor>[
+      OtelFlutterScreenSpanProcessor(),
+      BatchSpanProcessor(exporter: mySpanExporter),
+    ],
+
+The processor runs in the shared core pipeline, so it stamps `screen.name`
+(and `flutter.route.name`) onto every span at start time — including Dio
+HTTP spans created in `comon_otel_dio`, which has no dependency on this
+package.
+
 ## Configuration
 
 `ComonOtelFlutterConfig` controls which signals are active and how they are
