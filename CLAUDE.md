@@ -27,9 +27,9 @@ fvm dart run melos bootstrap
 - `packages/comon_otel` (Dart puro): `fvm dart test test/comon_otel_test.dart` **funciona**. (Suíte canônica: entrypoint único com `part` files expondo `defineXxxTests()`.)
 - `packages/comon_otel_dio` e `packages/comon_otel_flutter`: **`fvm dart test` / `fvm flutter test` CRASHAM** — o parser de pubspec do **fvm 3.2.1** não engole o formato `resolution: workspace` (stack em `PubSpec.fromYamlString` / `Project.loadFromPath`). **Não é problema de código.** Use o binário pinado direto, de dentro do pacote:
   ```bash
-  /Users/usuario/fvm/versions/3.38.9/bin/dart test       # comon_otel_dio
-  /Users/usuario/fvm/versions/3.38.9/bin/flutter test    # comon_otel_flutter
-  /Users/usuario/fvm/versions/3.38.9/bin/flutter analyze # comon_otel_flutter
+  "$HOME/fvm/versions/3.38.9/bin/dart" test       # comon_otel_dio
+  "$HOME/fvm/versions/3.38.9/bin/flutter" test    # comon_otel_flutter
+  "$HOME/fvm/versions/3.38.9/bin/flutter" analyze # comon_otel_flutter
   ```
   É o **mesmo SDK 3.38.9** que o `.fvmrc` pina — só sem o wrapper quebrado. **Nunca** use `dart`/`flutter` pelados (pegam a SDK global errada).
 
