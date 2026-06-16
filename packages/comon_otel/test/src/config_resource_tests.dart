@@ -254,6 +254,52 @@ void defineConfigAndResourceTests() {
       expect(attributes['telemetry.sdk.version'], isNotEmpty);
     });
 
+    test(
+      'explicit batch/periodic init params drive batch behavior (no env)',
+      () async {
+        final transport = _FakeOtlpHttpTransport();
+
+        await Otel.shutdown();
+        await Otel.init(
+          serviceName: 'explicit-batch-service',
+          exporter: OtelExporter.otlpHttpJson,
+          endpoint: 'https://explicit-batch.example.com',
+          otlpTransport: transport,
+          useBatchSpanProcessor: true,
+          batchSpanProcessorScheduleDelay: const Duration(seconds: 60),
+          batchSpanProcessorMaxExportBatchSize: 512,
+          useBatchLogProcessor: true,
+          batchLogProcessorScheduleDelay: const Duration(seconds: 60),
+        );
+
+        await Otel.instance.tracer.traceAsync(
+          'explicit-batch-span',
+          fn: () async {
+            Otel.instance.logger.info('explicit-batch-log');
+          },
+        );
+
+        // With a 60s schedule delay and batching ON, nothing is exported yet.
+        expect(transport.requests, isEmpty);
+
+        await Otel.forceFlush();
+
+        // The http/json exporter has async beyond the flush-chain await, so
+        // poll until the trace request lands (mirrors the existing
+        // "reads OTEL env config" test, ~lines 119-123).
+        while (transport.requests.where((request) {
+          return request.request.body.contains('resourceSpans');
+        }).isEmpty) {
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+        }
+
+        final traceRequests = transport.requests.where((request) {
+          return request.request.body.contains('resourceSpans');
+        }).length;
+        expect(traceRequests, greaterThanOrEqualTo(1));
+      },
+    );
+
     test('applies span limit env settings to runtime span behavior', () async {
       OtelEnvConfig.overrideEnvSource(
         () => <String, String>{
