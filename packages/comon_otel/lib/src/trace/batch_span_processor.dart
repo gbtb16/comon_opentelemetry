@@ -52,7 +52,12 @@ final class BatchSpanProcessor implements SpanProcessor {
   @override
   Future<void> forceFlush() async {
     await _flushBatch(all: true);
-    await _exporter.forceFlush();
+    try {
+      await _exporter.forceFlush();
+    } catch (_) {
+      // Telemetry teardown must never throw into the host. SDK-level error
+      // reporting is tracked separately (F2.2, out of scope here).
+    }
   }
 
   @override
@@ -63,7 +68,11 @@ final class BatchSpanProcessor implements SpanProcessor {
     _isShutdown = true;
     _timer?.cancel();
     await _flushBatch(all: true);
-    await _exporter.shutdown();
+    try {
+      await _exporter.shutdown();
+    } catch (_) {
+      // See forceFlush: teardown failures are swallowed by design.
+    }
   }
 
   Future<void> _flushBatch({bool all = false}) {

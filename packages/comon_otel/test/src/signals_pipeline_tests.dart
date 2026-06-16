@@ -428,5 +428,37 @@ void defineSignalsPipelineTests() {
         isTrue,
       );
     });
+
+    test('BatchSpanProcessor.forceFlush swallows a throwing exporter teardown', () async {
+      final exporter = _ThrowingTeardownSpanExporter();
+      final processor = BatchSpanProcessor(exporter: exporter);
+
+      // Must complete normally even though the exporter throws on forceFlush.
+      await processor.forceFlush();
+      await processor.shutdown();
+
+      expect(exporter.forceFlushCalled, isTrue);
+      expect(exporter.shutdownCalled, isTrue);
+    });
   });
+}
+
+final class _ThrowingTeardownSpanExporter implements SpanExporter {
+  bool forceFlushCalled = false;
+  bool shutdownCalled = false;
+
+  @override
+  Future<ExportResult> export(List<SpanData> data) async => ExportResult.success;
+
+  @override
+  Future<void> forceFlush() async {
+    forceFlushCalled = true;
+    throw StateError('teardown boom');
+  }
+
+  @override
+  Future<void> shutdown() async {
+    shutdownCalled = true;
+    throw StateError('shutdown boom');
+  }
 }
