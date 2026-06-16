@@ -15,3 +15,6 @@ melos__.iml
 
 # Local overrides are for isolated package resolution only.
 **/pubspec_overrides.yaml
+
+# Flutter/Dart build output
+build/

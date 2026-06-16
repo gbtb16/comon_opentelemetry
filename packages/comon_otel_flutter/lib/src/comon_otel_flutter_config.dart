@@ -100,7 +100,12 @@ final class ComonOtelFlutterConfig {
   /// Optional listener invoked for captured platform dispatcher errors.
   final OtelFlutterErrorListener? platformErrorListener;
 
-  /// Prefix used for route spans.
+  /// Prefix that was used for the long-lived route-transition span.
+  ///
+  /// Retained for API/binary compatibility but currently inert: that
+  /// umbrella span is no longer created (it was a tracing anti-pattern and
+  /// embedded high-cardinality route names). Only the short screen-ready
+  /// span, named via [screenReadySpanNamePrefix], is emitted now.
   final String routeSpanNamePrefix;
 
   /// Prefix used for screen-ready spans.

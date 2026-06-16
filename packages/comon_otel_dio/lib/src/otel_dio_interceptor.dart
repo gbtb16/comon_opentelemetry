@@ -77,11 +77,17 @@ final class OtelDioInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    if (!Otel.isInitialized || !(requestFilter?.call(options) ?? true)) {
-      handler.next(options);
-      return;
+    try {
+      if (Otel.isInitialized && (requestFilter?.call(options) ?? true)) {
+        _startRequestSpan(options);
+      }
+    } catch (_) {
+      // Instrumentation must never break the real request.
     }
+    handler.next(options);
+  }
 
+  void _startRequestSpan(RequestOptions options) {
     final uri = options.uri;
     final originalMethod = options.method;
     final method = originalMethod.toUpperCase();
@@ -89,7 +95,6 @@ final class OtelDioInterceptor extends Interceptor {
     final attributes = <String, Object>{
       SemanticAttributes.httpMethod: method,
       SemanticAttributes.httpUrl: uri.toString(),
-      SemanticAttributes.httpRoute: uri.path.isEmpty ? '/' : uri.path,
       SemanticAttributes.netPeerName: uri.host,
       if (uri.hasPort) SemanticAttributes.netPeerPort: uri.port,
       SemanticAttributes.networkProtocolName: uri.scheme,
@@ -137,8 +142,6 @@ final class OtelDioInterceptor extends Interceptor {
     for (final entry in capturedRequestHeaders.entries) {
       span.setAttribute(entry.key, entry.value);
     }
-
-    handler.next(options);
   }
 
   @override
@@ -146,38 +149,44 @@ final class OtelDioInterceptor extends Interceptor {
     Response<dynamic> response,
     ResponseInterceptorHandler handler,
   ) {
-    final span = _takeSpan(response.requestOptions);
-    if (span != null) {
-      _applyResponseMetadata(span, response);
-      _applyHttpStatus(span, response.statusCode);
-      unawaited(span.end());
+    try {
+      final span = _takeSpan(response.requestOptions);
+      if (span != null) {
+        _applyResponseMetadata(span, response);
+        _applyHttpStatus(span, response.statusCode);
+        unawaited(span.end());
+      }
+    } catch (_) {
+      // Instrumentation must never break the real response.
     }
-
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    final span = _takeSpan(err.requestOptions);
-    if (span != null) {
-      final response = err.response;
-      final statusCode = response?.statusCode;
-      if (response != null) {
-        _applyResponseMetadata(span, response);
+    try {
+      final span = _takeSpan(err.requestOptions);
+      if (span != null) {
+        final response = err.response;
+        final statusCode = response?.statusCode;
+        if (response != null) {
+          _applyResponseMetadata(span, response);
+        }
+        final shouldRecordException = statusCode == null || statusCode >= 500;
+        if (shouldRecordException) {
+          span.recordException(err, stackTrace: err.stackTrace);
+          span.setStatus(
+            SpanStatus.error,
+            description: err.message ?? err.toString(),
+          );
+        } else {
+          _applyHttpStatus(span, statusCode);
+        }
+        unawaited(span.end());
       }
-      final shouldRecordException = statusCode == null || statusCode >= 500;
-      if (shouldRecordException) {
-        span.recordException(err, stackTrace: err.stackTrace);
-        span.setStatus(
-          SpanStatus.error,
-          description: err.message ?? err.toString(),
-        );
-      } else {
-        _applyHttpStatus(span, statusCode);
-      }
-      unawaited(span.end());
+    } catch (_) {
+      // Instrumentation must never break error propagation.
     }
-
     handler.next(err);
   }
 

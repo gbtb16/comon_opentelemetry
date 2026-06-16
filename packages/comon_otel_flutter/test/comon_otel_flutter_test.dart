@@ -2,9 +2,28 @@ import 'dart:ui';
 
 import 'package:comon_otel/comon_otel.dart';
 import 'package:comon_otel_flutter/comon_otel_flutter.dart';
-import 'package:comon_otel_flutter/src/navigation/otel_flutter_route_context.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+final class _CountingSpanExporter implements SpanExporter {
+  int forceFlushCount = 0;
+  final List<SpanData> spans = <SpanData>[];
+
+  @override
+  Future<ExportResult> export(List<SpanData> data) async {
+    spans.addAll(data);
+    return ExportResult.success;
+  }
+
+  @override
+  Future<void> forceFlush() async {
+    forceFlushCount += 1;
+  }
+
+  @override
+  Future<void> shutdown() async {}
+}
 
 void main() {
   late InMemorySpanExporter spanExporter;
@@ -35,6 +54,23 @@ void main() {
     OtelFlutterErrorHooks.clear();
     OtelFlutterBreadcrumbs.clear();
     OtelFlutterRouteContext.clear();
+  });
+
+  test('mobileResourceAttributesFrom builds OTel resource attributes', () {
+    final attributes = mobileResourceAttributesFrom(
+      osName: 'iOS',
+      osVersion: '17.4',
+      deviceModelIdentifier: 'iPhone15,2',
+      deviceManufacturer: 'Apple',
+      serviceVersion: '2.0.1',
+    );
+
+    expect(attributes['os.name'], 'iOS');
+    expect(attributes['os.version'], '17.4');
+    expect(attributes['device.model.identifier'], 'iPhone15,2');
+    expect(attributes['device.manufacturer'], 'Apple');
+    expect(attributes['service.version'], '2.0.1');
+    expect(attributes.containsKey('host.name'), isFalse);
   });
 
   test('install exposes the navigator observer by default', () {
@@ -117,6 +153,58 @@ void main() {
     expect(log.body, 'app.lifecycle');
     expect(log.attributes['flutter.lifecycle.state'], 'resumed');
     expect(log.attributes[SemanticAttributes.appLifecycleState], 'resumed');
+  });
+
+  for (final state in <AppLifecycleState>[
+    AppLifecycleState.paused,
+    AppLifecycleState.detached,
+    AppLifecycleState.hidden,
+  ]) {
+    test('flushes telemetry when the app is backgrounded ($state)', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final exporter = _CountingSpanExporter();
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'lifecycle-test',
+        spanProcessors: <SpanProcessor>[SimpleSpanProcessor(exporter)],
+        metricReaders: const <MetricReader>[],
+        logProcessors: const <LogProcessor>[],
+      );
+
+      final observer = OtelFlutterBindingObserver();
+      observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      observer.didChangeAppLifecycleState(state);
+
+      // Let the unawaited forceFlush microtask run.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(exporter.forceFlushCount, greaterThanOrEqualTo(1));
+
+      await Otel.shutdown();
+    });
+  }
+
+  test('does not flush on non-backgrounding lifecycle states', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final exporter = _CountingSpanExporter();
+    await Otel.shutdown();
+    await Otel.init(
+      serviceName: 'lifecycle-test',
+      spanProcessors: <SpanProcessor>[SimpleSpanProcessor(exporter)],
+      metricReaders: const <MetricReader>[],
+      logProcessors: const <LogProcessor>[],
+    );
+
+    final observer = OtelFlutterBindingObserver();
+    observer.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+
+    // Let any (unexpected) unawaited forceFlush microtask run.
+    await Future<void>.delayed(Duration.zero);
+
+    expect(exporter.forceFlushCount, 0);
+
+    await Otel.shutdown();
   });
 
   test('breadcrumbs keep only the configured tail', () {
@@ -255,20 +343,23 @@ void main() {
     expect(logExporter.logs.last.body, 'app.memory_pressure');
   });
 
-  testWidgets('navigator observer records route spans', (tester) async {
+  testWidgets('navigation emits only a sanitized screen_ready span', (
+    tester,
+  ) async {
     final observer = OtelNavigatorObserver();
 
     await tester.pumpWidget(
       MaterialApp(
         navigatorObservers: <NavigatorObserver>[observer],
         routes: <String, WidgetBuilder>{
-          '/details': (_) => const Scaffold(body: Text('details')),
+          '/order/12345': (_) => const Scaffold(body: Text('order')),
         },
         home: Scaffold(
           body: Builder(
             builder: (context) {
               return TextButton(
-                onPressed: () => Navigator.of(context).pushNamed('/details'),
+                onPressed: () =>
+                    Navigator.of(context).pushNamed('/order/12345'),
                 child: const Text('go'),
               );
             },
@@ -278,19 +369,24 @@ void main() {
     );
 
     await tester.tap(find.text('go'));
-    await tester.pumpAndSettle();
-    Navigator.of(tester.element(find.text('details'))).pop();
-    await tester.pumpAndSettle();
+    await tester.pump(); // fires the post-frame callback that ends screen_ready
+    await tester.pump();
     await Otel.forceFlush();
 
-    final routeSpan = spanExporter.spans.singleWhere(
-      (span) => span.name == 'flutter.route /details',
+    final names = spanExporter.spans.map((span) => span.name).toList();
+    expect(names, contains('flutter.screen_ready /order/:id'));
+    expect(
+      names.any((name) => name.startsWith('flutter.route ')),
+      isFalse,
+      reason: 'umbrella route span must no longer be created',
     );
-    expect(routeSpan.attributes['flutter.route.name'], '/details');
-    expect(routeSpan.attributes[SemanticAttributes.flutterRoute], '/details');
-    expect(routeSpan.attributes['screen.name'], '/details');
-    expect(routeSpan.attributes['screen.class'], isNotNull);
-    expect(routeSpan.attributes['flutter.navigation.action'], 'push');
+    expect(
+      names.any((name) => name.contains('12345')),
+      isFalse,
+      reason: 'route names must be sanitized against cardinality',
+    );
+
+    observer.dispose();
   });
 
   testWidgets('navigator observer records screen-ready spans', (tester) async {
@@ -330,6 +426,8 @@ void main() {
     );
     expect(readySpan.attributes[SemanticAttributes.flutterRoute], '/details');
     expect(readySpan.attributes['screen.name'], '/details');
+    expect(readySpan.attributes['screen.class'], isNotNull);
+    expect(readySpan.attributes['flutter.navigation.action'], 'push');
   });
 
   test(
@@ -677,6 +775,108 @@ void main() {
     expect(breadcrumbs, contains('tap checkout_button'));
   });
 
+  test('screen span processor stamps active screen onto spans', () async {
+    final exporter = InMemorySpanExporter();
+    await Otel.shutdown();
+    await Otel.init(
+      serviceName: 'stamp-test',
+      spanProcessors: <SpanProcessor>[
+        OtelFlutterScreenSpanProcessor(),
+        SimpleSpanProcessor(exporter),
+      ],
+      metricReaders: const <MetricReader>[],
+      logProcessors: const <LogProcessor>[],
+    );
+
+    OtelFlutterRouteContext.update(
+      routeName: '/checkout',
+      routeRuntimeType: 'CheckoutRoute',
+    );
+
+    await Otel.instance.tracer.traceAsync('http-call', fn: () async {});
+    await Otel.forceFlush();
+
+    final span = exporter.lastSpanNamed('http-call');
+    expect(span, isNotNull);
+    expect(span!.attributes['screen.name'], '/checkout');
+    expect(span.attributes['flutter.route.name'], '/checkout');
+
+    OtelFlutterRouteContext.clear();
+    await Otel.shutdown();
+  });
+
+  test(
+    'screen span processor never overwrites an explicit screen.name',
+    () async {
+      final exporter = InMemorySpanExporter();
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'stamp-guard-test',
+        spanProcessors: <SpanProcessor>[
+          OtelFlutterScreenSpanProcessor(),
+          SimpleSpanProcessor(exporter),
+        ],
+        metricReaders: const <MetricReader>[],
+        logProcessors: const <LogProcessor>[],
+      );
+
+      OtelFlutterRouteContext.update(
+        routeName: '/checkout',
+        routeRuntimeType: 'CheckoutRoute',
+      );
+
+      // The span is born with an explicit screen.name; onStart must not clobber
+      // it with the active route.
+      await Otel.instance.tracer.traceAsync(
+        'http-call',
+        attributes: const <String, Object>{'screen.name': '/explicit'},
+        fn: () async {},
+      );
+      await Otel.forceFlush();
+
+      final span = exporter.lastSpanNamed('http-call');
+      expect(span, isNotNull);
+      expect(span!.attributes['screen.name'], '/explicit');
+      // flutter.route.name was not set explicitly, so it is still stamped.
+      expect(span.attributes['flutter.route.name'], '/checkout');
+
+      OtelFlutterRouteContext.clear();
+      await Otel.shutdown();
+    },
+  );
+
+  test(
+    'screen span processor stamps nothing when no route is active',
+    () async {
+      final exporter = InMemorySpanExporter();
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'stamp-empty-test',
+        spanProcessors: <SpanProcessor>[
+          OtelFlutterScreenSpanProcessor(),
+          SimpleSpanProcessor(exporter),
+        ],
+        metricReaders: const <MetricReader>[],
+        logProcessors: const <LogProcessor>[],
+      );
+
+      OtelFlutterRouteContext.clear();
+
+      // With no active route context, onStart must early-return without
+      // throwing and leave the span unstamped.
+      await Otel.instance.tracer.traceAsync('http-call', fn: () async {});
+      await Otel.forceFlush();
+
+      final span = exporter.lastSpanNamed('http-call');
+      expect(span, isNotNull);
+      expect(span!.attributes.containsKey('screen.name'), isFalse);
+      expect(span.attributes.containsKey('flutter.route.name'), isFalse);
+
+      OtelFlutterRouteContext.clear();
+      await Otel.shutdown();
+    },
+  );
+
   test(
     'interaction helpers trace async form submissions and failures',
     () async {
@@ -716,4 +916,77 @@ void main() {
       );
     },
   );
+
+  group('OtelNavigatorObserver.sanitizeRouteName', () {
+    test('collapses numeric and uuid segments to :id', () {
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName('/order/12345'),
+        '/order/:id',
+      );
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName(
+          '/u/3fa85f64-5717-4562-b3fc-2c963f66afa6',
+        ),
+        '/u/:id',
+      );
+    });
+
+    test('strips query string and fragment before sanitizing', () {
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName('/order/12345?from=push'),
+        '/order/:id',
+      );
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName('/order/12345#section'),
+        '/order/:id',
+      );
+    });
+
+    test('sanitizes relative names without a leading slash', () {
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName('profile/42'),
+        'profile/:id',
+      );
+    });
+  });
+
+  test('iosResourceValuesFrom reads systemName, never the PII device name', () {
+    const piiDeviceName = 'iPhone de João';
+    final ios = IosDeviceInfo.setMockInitialValues(
+      name: piiDeviceName, // PII — must NOT appear in any extracted value
+      systemName: 'iOS',
+      systemVersion: '17.4',
+      model: 'iPhone',
+      modelName: 'iPhone 15 Pro',
+      localizedModel: 'iPhone',
+      identifierForVendor: 'FAKE-UUID',
+      isPhysicalDevice: true,
+      isiOSAppOnMac: false,
+      isiOSAppOnVision: false,
+      freeDiskSize: 1,
+      totalDiskSize: 2,
+      physicalRamSize: 1,
+      availableRamSize: 1,
+      utsname: IosUtsname.setMockInitialValues(
+        sysname: 'Darwin',
+        nodename: 'iPhone',
+        release: '23.0.0',
+        version: 'x',
+        machine: 'iPhone15,2',
+      ),
+    );
+
+    final values = iosResourceValuesFrom(ios);
+
+    expect(values.osName, 'iOS');
+    expect(values.osVersion, '17.4');
+    expect(values.modelId, 'iPhone15,2');
+    expect(values.manufacturer, 'Apple');
+    expect(<String>[
+      values.osName,
+      values.osVersion,
+      values.modelId,
+      values.manufacturer,
+    ], isNot(contains(piiDeviceName)));
+  });
 }

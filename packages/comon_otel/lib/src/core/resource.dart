@@ -28,6 +28,23 @@ final class HostResourceDetector implements ResourceDetector {
   }
 }
 
+/// Detects OpenTelemetry SDK identity attributes (spec-mandatory).
+final class TelemetrySdkResourceDetector implements ResourceDetector {
+  /// Creates a telemetry SDK resource detector.
+  const TelemetrySdkResourceDetector();
+
+  @override
+  Map<String, Object> detect() {
+    // telemetry.sdk.version is hardcoded; keep it in sync with the package
+    // version in pubspec.yaml on every release bump.
+    return const <String, Object>{
+      'telemetry.sdk.name': 'comon_otel',
+      'telemetry.sdk.language': 'dart',
+      'telemetry.sdk.version': '0.0.1-alpha.1',
+    };
+  }
+}
+
 /// OpenTelemetry resource describing the entity that emits telemetry.
 final class Resource {
   /// Creates a resource from raw [attributes].
@@ -43,6 +60,7 @@ final class Resource {
   static const List<ResourceDetector> defaultDetectors = <ResourceDetector>[
     ProcessResourceDetector(),
     HostResourceDetector(),
+    TelemetrySdkResourceDetector(),
   ];
 
   /// Platform-derived fallback service name.
@@ -80,6 +98,7 @@ final class Resource {
   /// Creates a resource by combining detector output with explicit attributes.
   factory Resource.autoDetect({
     required String serviceName,
+    String? serviceVersion,
     String? environment,
     String? schemaUrl,
     Iterable<ResourceDetector>? detectors,
@@ -90,12 +109,17 @@ final class Resource {
       detectedAttributes.addAll(detector.detect());
     }
     detectedAttributes.remove('service.name');
+    if (serviceVersion != null) {
+      // An explicit serviceVersion must win over any detector that emits one.
+      detectedAttributes.remove('service.version');
+    }
     if (environment != null) {
       detectedAttributes.remove('deployment.environment');
     }
 
     return Resource(
       serviceName: serviceName,
+      serviceVersion: serviceVersion,
       environment: environment,
       schemaUrl: schemaUrl,
       extra: <String, Object>{...detectedAttributes, ...?extra},

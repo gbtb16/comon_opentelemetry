@@ -54,7 +54,7 @@ void main() {
       span.attributes[SemanticAttributes.httpUrl],
       'https://example.com/users',
     );
-    expect(span.attributes[SemanticAttributes.httpRoute], '/users');
+    expect(span.attributes.containsKey(SemanticAttributes.httpRoute), isFalse);
     expect(span.attributes[SemanticAttributes.httpStatusCode], 200);
     expect(span.status, SpanStatus.ok);
   });
@@ -248,17 +248,25 @@ void main() {
     });
     await Otel.forceFlush();
 
-    final spansByRoute = <String, SpanData>{
+    final spansByUrl = <String, SpanData>{
       for (final span in spanExporter.spans)
-        span.attributes[SemanticAttributes.httpRoute]! as String: span,
+        span.attributes[SemanticAttributes.httpUrl]! as String: span,
     };
-    expect(spansByRoute.keys, containsAll(<String>['/slow', '/fast']));
     expect(
-      spansByRoute['/slow']?.attributes[SemanticAttributes.httpUrl],
+      spansByUrl.keys,
+      containsAll(<String>[
+        'https://example.com/slow',
+        'https://example.com/fast',
+      ]),
+    );
+    expect(
+      spansByUrl['https://example.com/slow']?.attributes[SemanticAttributes
+          .httpUrl],
       'https://example.com/slow',
     );
     expect(
-      spansByRoute['/fast']?.attributes[SemanticAttributes.httpUrl],
+      spansByUrl['https://example.com/fast']?.attributes[SemanticAttributes
+          .httpUrl],
       'https://example.com/fast',
     );
   });
@@ -340,6 +348,31 @@ void main() {
       expect(span.attributes['http.response.header.x_request_id'], 'req-42');
     },
   );
+
+  test('request proceeds even when instrumentation throws', () async {
+    final dio = Dio()
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        return ResponseBody.fromString('ok', 200);
+      })
+      ..interceptors.add(
+        OtelDioInterceptor(
+          spanNameBuilder: (_) => throw StateError('instrumentation boom'),
+        ),
+      );
+
+    final response = await dio.get<dynamic>('https://example.com/users');
+    expect(response.statusCode, 200);
+  });
+
+  // The onResponse/onError handlers wrap their telemetry in the same try/catch
+  // as onRequest and always call handler.next. They are not exercised by a
+  // dedicated forced-throw test because there is no clean public seam to make
+  // the inner telemetry throw: `Span` is a `final` class (cannot be subclassed
+  // into a throwing fake) and `_takeSpan` is null-safe, so a real SDK span is
+  // always used and its setAttribute/setStatus/end calls do not throw for valid
+  // responses. Forcing it would require adding a production-only test seam,
+  // which is not warranted for this swallow path; the onRequest test above plus
+  // the success/5xx/timeout tests cover the handler.next contract on every path.
 
   test('records method_original for non-standard methods', () async {
     final dio = Dio()

@@ -17,7 +17,12 @@ final class OtelNavigatorObserver extends NavigatorObserver {
     this.loggerName = 'comon_otel.flutter',
   });
 
-  /// Prefix used for route transition spans.
+  /// Prefix that was used for the long-lived route-transition span.
+  ///
+  /// Retained for API compatibility but currently inert: that umbrella span
+  /// is no longer created (it was a tracing anti-pattern and embedded
+  /// high-cardinality route names). Only the short screen-ready span, named
+  /// via [screenReadySpanNamePrefix], is emitted now.
   final String spanNamePrefix;
 
   /// Prefix used for screen-ready spans.
@@ -28,8 +33,13 @@ final class OtelNavigatorObserver extends NavigatorObserver {
 
   /// Logger name used for navigation logs.
   final String loggerName;
-  final Map<Route<dynamic>, Span> _activeSpans = <Route<dynamic>, Span>{};
   final Map<Route<dynamic>, Span> _screenReadySpans = <Route<dynamic>, Span>{};
+
+  static final RegExp _numericSegment = RegExp(r'^\d+$');
+  static final RegExp _uuidSegment = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+    r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
@@ -56,17 +66,12 @@ final class OtelNavigatorObserver extends NavigatorObserver {
     }
   }
 
-  /// Ends active spans and clears the stored route context.
+  /// Ends active screen-ready spans and clears the stored route context.
   void dispose() {
-    for (final span in _activeSpans.values) {
-      span.setStatus(SpanStatus.ok);
-      unawaited(span.end());
-    }
     for (final span in _screenReadySpans.values) {
       span.setStatus(SpanStatus.ok);
       unawaited(span.end());
     }
-    _activeSpans.clear();
     _screenReadySpans.clear();
     OtelFlutterRouteContext.clear();
   }
@@ -76,7 +81,7 @@ final class OtelNavigatorObserver extends NavigatorObserver {
     Route<dynamic>? previousRoute, {
     required String action,
   }) {
-    if (!Otel.isInitialized || _activeSpans.containsKey(route)) {
+    if (!Otel.isInitialized || _screenReadySpans.containsKey(route)) {
       return;
     }
 
@@ -97,24 +102,6 @@ final class OtelNavigatorObserver extends NavigatorObserver {
           ? _routeName(previousRoute)
           : null,
     );
-    final span = Otel.instance.tracer.startSpan(
-      '$spanNamePrefix $routeName',
-      kind: SpanKind.internal,
-      attributes: <String, Object>{
-        'flutter.navigation.action': action,
-        'flutter.route.name': routeName,
-        SemanticAttributes.flutterRoute: routeName,
-        'screen.name': routeName,
-        'screen.class': route.runtimeType.toString(),
-        'flutter.route.runtime_type': route.runtimeType.toString(),
-        if (previousRoute != null)
-          'flutter.previous_route.name': _routeName(previousRoute),
-        if (previousRoute != null)
-          'screen.previous.name': _routeName(previousRoute),
-      },
-    );
-
-    _activeSpans[route] = span;
     _trackScreenReady(route, previousRoute, action: action);
     Otel.instance.loggerProvider
         .getLogger(loggerName)
@@ -146,22 +133,6 @@ final class OtelNavigatorObserver extends NavigatorObserver {
     } else {
       OtelFlutterRouteContext.clear();
     }
-
-    final span = _activeSpans.remove(route);
-    if (span == null) {
-      return;
-    }
-
-    span.addEvent(
-      'flutter.navigation.$action',
-      attributes: <String, Object>{
-        'flutter.route.name': _routeName(route),
-        if (previousRoute != null)
-          'flutter.previous_route.name': _routeName(previousRoute),
-      },
-    );
-    span.setStatus(SpanStatus.ok);
-    unawaited(span.end());
 
     final readySpan = _screenReadySpans.remove(route);
     if (readySpan != null) {
@@ -228,8 +199,29 @@ final class OtelNavigatorObserver extends NavigatorObserver {
   String _routeName(Route<dynamic> route) {
     final name = route.settings.name;
     if (name != null && name.isNotEmpty) {
-      return name;
+      return sanitizeRouteName(name);
     }
     return route.runtimeType.toString();
+  }
+
+  /// Collapses dynamic route segments to `:id` for cardinality safety.
+  ///
+  /// Strips any query string / fragment first and normalizes regardless of a
+  /// leading `/`, so an id hidden behind `?`/`#` (e.g. `/order/12345?from=push`)
+  /// or in a relative name (e.g. `profile/42` from go_router / onGenerateRoute)
+  /// can't leak a high-cardinality value into span/route attributes.
+  @visibleForTesting
+  static String sanitizeRouteName(String name) {
+    final path = name.split('?').first.split('#').first;
+    final segments = path.split('/').map((segment) {
+      if (segment.isEmpty) {
+        return segment;
+      }
+      if (_numericSegment.hasMatch(segment) || _uuidSegment.hasMatch(segment)) {
+        return ':id';
+      }
+      return segment;
+    });
+    return segments.join('/');
   }
 }

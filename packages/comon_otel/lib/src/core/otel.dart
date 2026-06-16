@@ -79,6 +79,8 @@ final class Otel {
   /// Explicit arguments override supported environment-based defaults.
   static Future<void> init({
     String serviceName = '',
+    String? serviceVersion,
+    List<ResourceDetector>? resourceDetectors,
     String? resourceSchemaUrl,
     String? endpoint,
     String? tracesEndpoint,
@@ -92,6 +94,19 @@ final class Otel {
     SamplerConfig? sampler,
     Map<String, Object>? resourceAttributes,
     SpanLimits spanLimits = const SpanLimits(),
+    bool? useBatchSpanProcessor,
+    Duration? batchSpanProcessorScheduleDelay,
+    Duration? batchSpanProcessorExportTimeout,
+    int? batchSpanProcessorMaxQueueSize,
+    int? batchSpanProcessorMaxExportBatchSize,
+    bool? useBatchLogProcessor,
+    Duration? batchLogProcessorScheduleDelay,
+    Duration? batchLogProcessorExportTimeout,
+    int? batchLogProcessorMaxQueueSize,
+    int? batchLogProcessorMaxExportBatchSize,
+    bool? usePeriodicMetricReader,
+    Duration? metricExportInterval,
+    Duration? metricExportTimeout,
     List<SpanProcessor>? spanProcessors,
     List<LogProcessor>? logProcessors,
     List<MetricReader>? metricReaders,
@@ -204,19 +219,33 @@ final class Otel {
       sampler: resolvedSampler,
       resourceAttributes: resolvedResourceAttributes,
       spanLimits: resolvedSpanLimits,
-      useBatchSpanProcessor: OtelEnvConfig.hasBspConfig,
-      batchSpanProcessorScheduleDelay: OtelEnvConfig.bspScheduleDelay,
-      batchSpanProcessorExportTimeout: OtelEnvConfig.bspExportTimeout,
-      batchSpanProcessorMaxQueueSize: OtelEnvConfig.bspMaxQueueSize,
-      batchSpanProcessorMaxExportBatchSize: OtelEnvConfig.bspMaxExportBatchSize,
-      useBatchLogProcessor: OtelEnvConfig.hasBlrpConfig,
-      batchLogProcessorScheduleDelay: OtelEnvConfig.blrpScheduleDelay,
-      batchLogProcessorExportTimeout: OtelEnvConfig.blrpExportTimeout,
-      batchLogProcessorMaxQueueSize: OtelEnvConfig.blrpMaxQueueSize,
-      batchLogProcessorMaxExportBatchSize: OtelEnvConfig.blrpMaxExportBatchSize,
-      usePeriodicMetricReader: OtelEnvConfig.hasMetricReaderConfig,
-      metricExportInterval: OtelEnvConfig.metricExportInterval,
-      metricExportTimeout: OtelEnvConfig.metricExportTimeout,
+      useBatchSpanProcessor:
+          useBatchSpanProcessor ?? OtelEnvConfig.hasBspConfig,
+      batchSpanProcessorScheduleDelay:
+          batchSpanProcessorScheduleDelay ?? OtelEnvConfig.bspScheduleDelay,
+      batchSpanProcessorExportTimeout:
+          batchSpanProcessorExportTimeout ?? OtelEnvConfig.bspExportTimeout,
+      batchSpanProcessorMaxQueueSize:
+          batchSpanProcessorMaxQueueSize ?? OtelEnvConfig.bspMaxQueueSize,
+      batchSpanProcessorMaxExportBatchSize:
+          batchSpanProcessorMaxExportBatchSize ??
+          OtelEnvConfig.bspMaxExportBatchSize,
+      useBatchLogProcessor: useBatchLogProcessor ?? OtelEnvConfig.hasBlrpConfig,
+      batchLogProcessorScheduleDelay:
+          batchLogProcessorScheduleDelay ?? OtelEnvConfig.blrpScheduleDelay,
+      batchLogProcessorExportTimeout:
+          batchLogProcessorExportTimeout ?? OtelEnvConfig.blrpExportTimeout,
+      batchLogProcessorMaxQueueSize:
+          batchLogProcessorMaxQueueSize ?? OtelEnvConfig.blrpMaxQueueSize,
+      batchLogProcessorMaxExportBatchSize:
+          batchLogProcessorMaxExportBatchSize ??
+          OtelEnvConfig.blrpMaxExportBatchSize,
+      usePeriodicMetricReader:
+          usePeriodicMetricReader ?? OtelEnvConfig.hasMetricReaderConfig,
+      metricExportInterval:
+          metricExportInterval ?? OtelEnvConfig.metricExportInterval,
+      metricExportTimeout:
+          metricExportTimeout ?? OtelEnvConfig.metricExportTimeout,
       spanProcessors: spanProcessors ?? const <SpanProcessor>[],
       logProcessors: logProcessors ?? const <LogProcessor>[],
       metricReaders: metricReaders ?? const <MetricReader>[],
@@ -242,8 +271,10 @@ final class Otel {
 
     final resource = Resource.autoDetect(
       serviceName: resolvedServiceName,
+      serviceVersion: serviceVersion,
       environment: environment,
       schemaUrl: resourceSchemaUrl,
+      detectors: resourceDetectors,
       extra: resolvedResourceAttributes,
     );
 

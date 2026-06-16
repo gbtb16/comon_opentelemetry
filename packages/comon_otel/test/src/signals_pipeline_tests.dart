@@ -364,5 +364,105 @@ void defineSignalsPipelineTests() {
 
       expect(periodicExporter.lastMetricNamed('periodic.count'), isNotNull);
     });
+
+    test('batch span processor recovers after a flush export throws', () async {
+      final throwingExporter = _ThrowOnceSpanExporter();
+      final processor = BatchSpanProcessor(
+        exporter: throwingExporter,
+        maxBatchSize: 1000,
+        scheduleDelay: const Duration(minutes: 1),
+      );
+
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'test-service',
+        spanProcessors: <SpanProcessor>[processor],
+        metricReaders: <MetricReader>[
+          ExportingMetricReader(exporter: metricExporter),
+        ],
+        logProcessors: <LogProcessor>[SimpleLogProcessor(logExporter)],
+      );
+
+      await Otel.instance.tracer.traceAsync('first-span', fn: () async {});
+      // First flush hits the throwing export; the B1 fix swallows it so the
+      // chain stays alive and this flush resolves normally.
+      await processor.forceFlush();
+
+      await Otel.instance.tracer.traceAsync('second-span', fn: () async {});
+      await processor.forceFlush();
+
+      expect(
+        throwingExporter.exported.any((span) => span.name == 'second-span'),
+        isTrue,
+      );
+    });
+
+    test('batch log processor recovers after a flush export throws', () async {
+      final throwingExporter = _ThrowOnceLogExporter();
+      final processor = BatchLogProcessor(
+        exporter: throwingExporter,
+        maxBatchSize: 1000,
+        scheduleDelay: const Duration(minutes: 1),
+      );
+
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'test-service',
+        spanProcessors: <SpanProcessor>[SimpleSpanProcessor(exporter)],
+        metricReaders: <MetricReader>[
+          ExportingMetricReader(exporter: metricExporter),
+        ],
+        logProcessors: <LogProcessor>[processor],
+      );
+
+      Otel.instance.logger.info('first-log');
+      // The B1 fix swallows the throwing export, so this flush resolves
+      // normally.
+      await processor.forceFlush();
+
+      Otel.instance.logger.info('second-log');
+      await processor.forceFlush();
+
+      expect(
+        throwingExporter.exported.any((log) => log.body == 'second-log'),
+        isTrue,
+      );
+    });
+
+    test(
+      'BatchSpanProcessor.forceFlush swallows a throwing exporter teardown',
+      () async {
+        final exporter = _ThrowingTeardownSpanExporter();
+        final processor = BatchSpanProcessor(exporter: exporter);
+
+        // Must complete normally even though the exporter throws on forceFlush.
+        await processor.forceFlush();
+        await processor.shutdown();
+
+        expect(exporter.forceFlushCalled, isTrue);
+        expect(exporter.shutdownCalled, isTrue);
+      },
+    );
   });
+}
+
+final class _ThrowingTeardownSpanExporter implements SpanExporter {
+  bool forceFlushCalled = false;
+  bool shutdownCalled = false;
+
+  @override
+  Future<ExportResult> export(List<SpanData> data) async =>
+      ExportResult.success;
+
+  @override
+  Future<void> forceFlush() async {
+    forceFlushCalled = true;
+    throw StateError('teardown boom');
+  }
+
+  @override
+  Future<void> shutdown() async {
+    shutdownCalled = true;
+    throw StateError('shutdown boom');
+  }
 }
