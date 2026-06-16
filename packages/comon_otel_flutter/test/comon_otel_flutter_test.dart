@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:comon_otel/comon_otel.dart';
 import 'package:comon_otel_flutter/comon_otel_flutter.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -947,5 +948,48 @@ void main() {
         'profile/:id',
       );
     });
+  });
+
+  test('iosResourceValuesFrom reads systemName, never the PII device name', () {
+    const piiDeviceName = 'iPhone de João';
+    final ios = IosDeviceInfo.setMockInitialValues(
+      name: piiDeviceName, // PII — must NOT appear in any extracted value
+      systemName: 'iOS',
+      systemVersion: '17.4',
+      model: 'iPhone',
+      modelName: 'iPhone 15 Pro',
+      localizedModel: 'iPhone',
+      identifierForVendor: 'FAKE-UUID',
+      isPhysicalDevice: true,
+      isiOSAppOnMac: false,
+      isiOSAppOnVision: false,
+      freeDiskSize: 1,
+      totalDiskSize: 2,
+      physicalRamSize: 1,
+      availableRamSize: 1,
+      utsname: IosUtsname.setMockInitialValues(
+        sysname: 'Darwin',
+        nodename: 'iPhone',
+        release: '23.0.0',
+        version: 'x',
+        machine: 'iPhone15,2',
+      ),
+    );
+
+    final values = iosResourceValuesFrom(ios);
+
+    expect(values.osName, 'iOS');
+    expect(values.osVersion, '17.4');
+    expect(values.modelId, 'iPhone15,2');
+    expect(values.manufacturer, 'Apple');
+    expect(
+      <String>[
+        values.osName,
+        values.osVersion,
+        values.modelId,
+        values.manufacturer,
+      ],
+      isNot(contains(piiDeviceName)),
+    );
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:package_info_plus/package_info_plus.dart';
 
 /// Builds OTel resource attributes from already-resolved device/app values.
@@ -34,6 +35,23 @@ Map<String, Object> mobileResourceAttributesFrom({
 /// host.name PII this package omits on mobile. Platform-channel-bound, so it
 /// is verified via the example app / staging rather than unit tests; the pure
 /// [mobileResourceAttributesFrom] above carries the unit-tested mapping.
+/// Non-PII resource values extracted from iOS device info.
+///
+/// Reads [IosDeviceInfo.systemName] ("iOS"/"iPadOS") — deliberately NOT
+/// [IosDeviceInfo.name], the user-assigned device name ("iPhone de João") that
+/// would re-introduce the host.name PII this package omits on mobile. Kept as a
+/// named seam so a regression (reading `name`) is caught by a unit test.
+@visibleForTesting
+({String osName, String osVersion, String modelId, String manufacturer})
+iosResourceValuesFrom(IosDeviceInfo ios) {
+  return (
+    osName: ios.systemName,
+    osVersion: ios.systemVersion,
+    modelId: ios.utsname.machine,
+    manufacturer: 'Apple',
+  );
+}
+
 Future<Map<String, Object>> detectMobileResourceAttributes() async {
   final deviceInfo = DeviceInfoPlugin();
   final packageInfo = await PackageInfo.fromPlatform();
@@ -45,10 +63,11 @@ Future<Map<String, Object>> detectMobileResourceAttributes() async {
 
   if (Platform.isIOS) {
     final ios = await deviceInfo.iosInfo;
-    osName = ios.systemName; // "iOS"/"iPadOS" — NOT ios.name (PII)
-    osVersion = ios.systemVersion; // "17.4"
-    deviceModelIdentifier = ios.utsname.machine; // "iPhone15,2"
-    deviceManufacturer = 'Apple';
+    final values = iosResourceValuesFrom(ios);
+    osName = values.osName;
+    osVersion = values.osVersion;
+    deviceModelIdentifier = values.modelId;
+    deviceManufacturer = values.manufacturer;
   } else if (Platform.isAndroid) {
     final android = await deviceInfo.androidInfo;
     osName = 'Android';
