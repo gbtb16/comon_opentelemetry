@@ -199,20 +199,26 @@ final class OtelNavigatorObserver extends NavigatorObserver {
   String _routeName(Route<dynamic> route) {
     final name = route.settings.name;
     if (name != null && name.isNotEmpty) {
-      return _sanitizeRouteName(name);
+      return sanitizeRouteName(name);
     }
     return route.runtimeType.toString();
   }
 
-  String _sanitizeRouteName(String name) {
-    if (!name.startsWith('/')) {
-      return name;
-    }
-    final segments = name.split('/').map((segment) {
+  /// Collapses dynamic route segments to `:id` for cardinality safety.
+  ///
+  /// Strips any query string / fragment first and normalizes regardless of a
+  /// leading `/`, so an id hidden behind `?`/`#` (e.g. `/order/12345?from=push`)
+  /// or in a relative name (e.g. `profile/42` from go_router / onGenerateRoute)
+  /// can't leak a high-cardinality value into span/route attributes.
+  @visibleForTesting
+  static String sanitizeRouteName(String name) {
+    final path = name.split('?').first.split('#').first;
+    final segments = path.split('/').map((segment) {
       if (segment.isEmpty) {
         return segment;
       }
-      if (_numericSegment.hasMatch(segment) || _uuidSegment.hasMatch(segment)) {
+      if (_numericSegment.hasMatch(segment) ||
+          _uuidSegment.hasMatch(segment)) {
         return ':id';
       }
       return segment;

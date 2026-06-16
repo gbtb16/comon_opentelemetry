@@ -915,4 +915,37 @@ void main() {
       );
     },
   );
+
+  group('OtelNavigatorObserver.sanitizeRouteName', () {
+    test('collapses numeric and uuid segments to :id', () {
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName('/order/12345'),
+        '/order/:id',
+      );
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName(
+          '/u/3fa85f64-5717-4562-b3fc-2c963f66afa6',
+        ),
+        '/u/:id',
+      );
+    });
+
+    test('strips query string and fragment before sanitizing', () {
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName('/order/12345?from=push'),
+        '/order/:id',
+      );
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName('/order/12345#section'),
+        '/order/:id',
+      );
+    });
+
+    test('sanitizes relative names without a leading slash', () {
+      expect(
+        OtelNavigatorObserver.sanitizeRouteName('profile/42'),
+        'profile/:id',
+      );
+    });
+  });
 }
