@@ -79,6 +79,8 @@ final class Otel {
   /// Explicit arguments override supported environment-based defaults.
   static Future<void> init({
     String serviceName = '',
+    String? serviceVersion,
+    List<ResourceDetector>? resourceDetectors,
     String? resourceSchemaUrl,
     String? endpoint,
     String? tracesEndpoint,
@@ -270,8 +272,10 @@ final class Otel {
 
     final resource = Resource.autoDetect(
       serviceName: resolvedServiceName,
+      serviceVersion: serviceVersion,
       environment: environment,
       schemaUrl: resourceSchemaUrl,
+      detectors: resourceDetectors,
       extra: resolvedResourceAttributes,
     );
 

@@ -81,6 +81,23 @@ batching and periodic metric export explicitly:
 Without `usePeriodicMetricReader: true`, metrics are only exported on
 `forceFlush()` (e.g. on app background) and never on a timer.
 
+## Resource & PII on mobile
+
+`host.name` is the device host name (e.g. "iPhone de João") — PII. On
+mobile, omit `HostResourceDetector` and supply device attributes instead:
+
+    final resourceAttributes = await detectMobileResourceAttributes();
+    await Otel.init(
+      serviceName: 'my-app',
+      serviceVersion: resourceAttributes['service.version'] as String?,
+      resourceAttributes: resourceAttributes,
+      resourceDetectors: const <ResourceDetector>[
+        ProcessResourceDetector(),
+        TelemetrySdkResourceDetector(),
+      ],
+      // ...
+    );
+
 To correlate HTTP and interaction spans with the active screen, add the
 screen span processor to your processors (alongside your exporter
 processor):

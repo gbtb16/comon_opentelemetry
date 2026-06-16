@@ -28,6 +28,21 @@ final class HostResourceDetector implements ResourceDetector {
   }
 }
 
+/// Detects OpenTelemetry SDK identity attributes (spec-mandatory).
+final class TelemetrySdkResourceDetector implements ResourceDetector {
+  /// Creates a telemetry SDK resource detector.
+  const TelemetrySdkResourceDetector();
+
+  @override
+  Map<String, Object> detect() {
+    return const <String, Object>{
+      'telemetry.sdk.name': 'comon_otel',
+      'telemetry.sdk.language': 'dart',
+      'telemetry.sdk.version': '0.0.1-alpha.1',
+    };
+  }
+}
+
 /// OpenTelemetry resource describing the entity that emits telemetry.
 final class Resource {
   /// Creates a resource from raw [attributes].
@@ -80,6 +95,7 @@ final class Resource {
   /// Creates a resource by combining detector output with explicit attributes.
   factory Resource.autoDetect({
     required String serviceName,
+    String? serviceVersion,
     String? environment,
     String? schemaUrl,
     Iterable<ResourceDetector>? detectors,
@@ -96,6 +112,7 @@ final class Resource {
 
     return Resource(
       serviceName: serviceName,
+      serviceVersion: serviceVersion,
       environment: environment,
       schemaUrl: schemaUrl,
       extra: <String, Object>{...detectedAttributes, ...?extra},

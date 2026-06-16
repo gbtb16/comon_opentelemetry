@@ -55,6 +55,23 @@ void main() {
     OtelFlutterRouteContext.clear();
   });
 
+  test('mobileResourceAttributesFrom builds OTel resource attributes', () {
+    final attributes = mobileResourceAttributesFrom(
+      osName: 'iOS',
+      osVersion: '17.4',
+      deviceModelIdentifier: 'iPhone15,2',
+      deviceManufacturer: 'Apple',
+      serviceVersion: '2.0.1',
+    );
+
+    expect(attributes['os.name'], 'iOS');
+    expect(attributes['os.version'], '17.4');
+    expect(attributes['device.model.identifier'], 'iPhone15,2');
+    expect(attributes['device.manufacturer'], 'Apple');
+    expect(attributes['service.version'], '2.0.1');
+    expect(attributes.containsKey('host.name'), isFalse);
+  });
+
   test('install exposes the navigator observer by default', () {
     final instrumentation = ComonOtelFlutter.install(
       config: const ComonOtelFlutterConfig(observeAppLifecycle: false),

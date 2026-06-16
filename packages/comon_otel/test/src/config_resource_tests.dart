@@ -521,6 +521,25 @@ void defineConfigAndResourceTests() {
       },
     );
 
+    test('omitting HostResourceDetector keeps host.name out of the resource', () async {
+      await Otel.shutdown();
+      await Otel.init(
+        serviceName: 'pii-test',
+        serviceVersion: '1.2.3',
+        resourceDetectors: const <ResourceDetector>[
+          ProcessResourceDetector(),
+          TelemetrySdkResourceDetector(),
+        ],
+      );
+
+      final attributes = Otel.instance.tracerProvider.resource.attributes;
+      expect(attributes.containsKey('host.name'), isFalse);
+      expect(attributes['service.version'], '1.2.3');
+      expect(attributes['telemetry.sdk.name'], 'comon_otel');
+      expect(attributes['telemetry.sdk.language'], 'dart');
+      expect(attributes['telemetry.sdk.version'], isNotEmpty);
+    });
+
     test('preserves resource schemaUrl through bootstrap and merge', () {
       expect(Resource.empty().schemaUrl, isNull);
 

@@ -8,4 +8,5 @@ export 'interactions/interactions.dart';
 export 'lifecycle/otel_flutter_binding_observer.dart';
 export 'navigation/navigation.dart';
 export 'performance/performance.dart';
+export 'resource/resource.dart';
 export 'startup/startup.dart';
