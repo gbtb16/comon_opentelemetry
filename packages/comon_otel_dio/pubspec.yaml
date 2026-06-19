@@ -1,6 +1,10 @@
 name: comon_otel_dio
 description: Dio interceptor package for comon_otel with request tracing and propagation.
 version: 0.0.1-alpha.1
+# Consumed as a git monorepo dependency (sibling `comon_otel` via path), which
+# is incompatible with pub.dev publishing. Upstream (serezhia) publishes; this
+# fork is git-consumed only.
+publish_to: none
 resolution: workspace
 homepage: https://github.com/serezhia/comon_opentelemetry/tree/main/packages/comon_otel_dio
 repository: https://github.com/serezhia/comon_opentelemetry
@@ -18,7 +22,7 @@ environment:
 
 dependencies:
   comon_otel:
-    version: ^0.0.1-alpha.1
+    path: ../comon_otel
   dio: ^5.9.0
 
 dev_dependencies:
