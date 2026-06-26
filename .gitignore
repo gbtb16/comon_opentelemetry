@@ -18,3 +18,6 @@ melos__.iml
 
 # Flutter/Dart build output
 build/
+
+# Scratch do plugin superpowers (nao versionar)
+.superpowers/
