@@ -14,6 +14,7 @@ final class BatchLogProcessor implements LogProcessor {
     this.scheduleDelay = const Duration(seconds: 1),
     this.maxQueueSize = 2048,
     this.exportTimeout,
+    this.onDrop,
   }) : _exporter = exporter {
     _timer = Timer.periodic(scheduleDelay, (_) {
       unawaited(_flushBatch());
@@ -33,7 +34,15 @@ final class BatchLogProcessor implements LogProcessor {
 
   /// Optional timeout applied to each export operation.
   final Duration? exportTimeout;
+
+  /// Invoked once for each record evicted because the queue reached
+  /// [maxQueueSize]. Lets the host observe export saturation (drop count).
+  final void Function()? onDrop;
+
   final Queue<LogRecord> _queue = Queue<LogRecord>();
+
+  /// Current number of records buffered awaiting export.
+  int get queueLength => _queue.length;
 
   Timer? _timer;
   bool _isShutdown = false;
@@ -47,6 +56,7 @@ final class BatchLogProcessor implements LogProcessor {
     }
 
     if (_queue.length >= maxQueueSize) {
+      onDrop?.call();
       _queue.removeFirst();
     }
     _queue.addLast(record);

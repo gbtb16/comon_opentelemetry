@@ -13,6 +13,7 @@ final class BatchSpanProcessor implements SpanProcessor {
     this.scheduleDelay = const Duration(seconds: 5),
     this.maxQueueSize = 2048,
     this.exportTimeout,
+    this.onDrop,
   }) : _exporter = exporter {
     _timer = Timer.periodic(scheduleDelay, (_) {
       unawaited(_flushBatch());
@@ -24,7 +25,15 @@ final class BatchSpanProcessor implements SpanProcessor {
   final Duration scheduleDelay;
   final int maxQueueSize;
   final Duration? exportTimeout;
+
+  /// Invoked once for each span evicted because the queue reached
+  /// [maxQueueSize]. Lets the host observe export saturation (drop count).
+  final void Function()? onDrop;
+
   final Queue<SpanData> _queue = Queue<SpanData>();
+
+  /// Current number of spans buffered awaiting export.
+  int get queueLength => _queue.length;
 
   Timer? _timer;
   bool _isShutdown = false;
@@ -40,6 +49,7 @@ final class BatchSpanProcessor implements SpanProcessor {
     }
 
     if (_queue.length >= maxQueueSize) {
+      onDrop?.call();
       _queue.removeFirst();
     }
     _queue.addLast(span.toSpanData());
