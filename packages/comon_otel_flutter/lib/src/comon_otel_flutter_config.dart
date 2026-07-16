@@ -48,6 +48,8 @@ final class ComonOtelFlutterConfig {
     this.uiStallThreshold = const Duration(milliseconds: 100),
     this.breadcrumbCapacity = 20,
     this.appStartupStartTime,
+    this.appStartupAttributes,
+    this.staticMetricAttributes = const <String, Object>{},
     this.now,
     this.loggerName = 'comon_otel.flutter',
   });
@@ -170,6 +172,20 @@ final class ComonOtelFlutterConfig {
 
   /// Optional explicit app startup start time.
   final DateTime? appStartupStartTime;
+
+  /// Optional attributes attached to the root startup span from creation,
+  /// e.g. `launch.source`. Merge with [ComonOtelFlutterInstrumentation
+  /// .startupTracker]'s `setStartupAttribute` for values known only after
+  /// startup begins.
+  final Map<String, Object>? appStartupAttributes;
+
+  /// Static attributes merged into every metric recorded by Flutter
+  /// instrumentation (frame/build/raster durations, slow/jank counts, UI
+  /// stall duration/count, and the startup phase duration histogram), e.g.
+  /// `{'device.tier': 'low'}`. These must be closed-enum, low-cardinality
+  /// values decided by the app — the fork only propagates them as labels.
+  /// Per-record attributes win on key collision.
+  final Map<String, Object> staticMetricAttributes;
 
   /// Optional clock override, mainly for tests.
   final OtelFlutterNow? now;
