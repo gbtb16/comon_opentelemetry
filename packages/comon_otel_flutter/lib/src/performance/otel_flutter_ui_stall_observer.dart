@@ -15,6 +15,7 @@ final class OtelFlutterUiStallObserver {
     this.logName = 'flutter.ui_stall',
     this.checkInterval = const Duration(milliseconds: 50),
     this.threshold = const Duration(milliseconds: 100),
+    this.staticAttributes = const <String, Object>{},
     OtelFlutterNow? now,
   }) : _now = now ?? _defaultNow;
 
@@ -37,6 +38,10 @@ final class OtelFlutterUiStallObserver {
 
   /// Minimum excess delay considered a stall.
   final Duration threshold;
+
+  /// Static attributes merged into every recorded metric (e.g.
+  /// `device.tier`). Per-record attributes win on key collision.
+  final Map<String, Object> staticAttributes;
   final OtelFlutterNow _now;
 
   Timer? _timer;
@@ -107,6 +112,7 @@ final class OtelFlutterUiStallObserver {
     }
 
     final attributes = <String, Object>{
+      ...staticAttributes,
       'flutter.ui_stall.delay_ms': observedDelay.inMicroseconds / 1000,
       'flutter.ui_stall.threshold_ms': threshold.inMicroseconds / 1000,
       'flutter.ui_stall.check_interval_ms': checkInterval.inMicroseconds / 1000,
