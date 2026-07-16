@@ -165,9 +165,13 @@ final class OtelFlutterStartupTracker {
   }
 
   void _recordPhaseDuration(String phase, Stopwatch stopwatch) {
+    _recordPhaseDurationMs(phase, stopwatch.elapsedMicroseconds / 1000);
+  }
+
+  void _recordPhaseDurationMs(String phase, double durationMs) {
     try {
       _phaseDurationHistogram?.record(
-        stopwatch.elapsedMicroseconds / 1000,
+        durationMs,
         attributes: <String, Object>{
           ..._staticMetricAttributes,
           phaseAttribute: phase,
@@ -176,6 +180,53 @@ final class OtelFlutterStartupTracker {
     } catch (_) {
       // Telemetry never breaks the host.
     }
+  }
+
+  /// Records a startup phase that already ran to completion before the
+  /// tracker existed (e.g. DI/remote-config/migrations/auth-restore that
+  /// finish before [ComonOtelFlutter.install] runs). Same semantics as
+  /// [trackPhase]: creates a child span of the root startup span named
+  /// `<spanName>.<phase>` with explicit [start]/[end] times and the
+  /// [phaseAttribute], ends it immediately, and records `(end - start)` in
+  /// milliseconds into the `app.startup.phase.duration` histogram (labeled
+  /// with [phaseAttribute] plus any configured static metric attributes).
+  ///
+  /// If [end] is before [start] the recorded duration is clamped to zero
+  /// (still recorded — a bad clock read shouldn't silently drop the sample).
+  /// No span is created once the root startup span has already ended (post
+  /// [completeStartup]) or when Otel was never initialized, matching
+  /// [startPhase]; the histogram still records in both cases. Telemetry
+  /// failures are swallowed and never reach the host.
+  void recordCompletedPhase(
+    String phase, {
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final durationMs = end.isBefore(start)
+        ? 0.0
+        : end.difference(start).inMicroseconds / 1000;
+
+    if (Otel.isInitialized && !_startupCompleted) {
+      try {
+        final tracer = Otel.instance.tracerProvider.getTracer(
+          loggerName,
+          version: '0.0.1-alpha.1',
+        );
+        final span = tracer.startSpan(
+          '$spanName.$phase',
+          kind: SpanKind.internal,
+          parent: _startupSpan,
+          startTime: start,
+          attributes: <String, Object>{phaseAttribute: phase},
+        );
+        span.setStatus(SpanStatus.ok);
+        unawaited(span.end(endTime: end));
+      } catch (_) {
+        // Telemetry never breaks the host.
+      }
+    }
+
+    _recordPhaseDurationMs(phase, durationMs);
   }
 
   void _endPhaseSpan(
