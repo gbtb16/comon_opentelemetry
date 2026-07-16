@@ -77,6 +77,7 @@ final class ComonOtelFlutter {
             jankFrameCountMetricName: config.jankFrameCountMetricName,
             slowFrameThreshold: config.slowFrameThreshold,
             jankFrameThreshold: config.jankFrameThreshold,
+            staticAttributes: config.staticMetricAttributes,
           )
         : null;
 
@@ -89,6 +90,7 @@ final class ComonOtelFlutter {
             checkInterval: config.uiStallCheckInterval,
             threshold: config.uiStallThreshold,
             now: config.now,
+            staticAttributes: config.staticMetricAttributes,
           )
         : null;
 
@@ -107,6 +109,8 @@ final class ComonOtelFlutter {
             firstInteractionLogName: config.firstInteractionLogName,
             startTime: config.appStartupStartTime,
             markFirstFrame: config.markFirstFrame,
+            appStartupAttributes: config.appStartupAttributes,
+            staticMetricAttributes: config.staticMetricAttributes,
           )
         : null;
 

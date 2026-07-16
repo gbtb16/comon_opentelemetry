@@ -14,6 +14,7 @@ final class OtelFlutterFrameTimingObserver {
     this.jankFrameCountMetricName = 'flutter.frame.jank.count',
     this.slowFrameThreshold = const Duration(milliseconds: 16),
     this.jankFrameThreshold = const Duration(milliseconds: 32),
+    this.staticAttributes = const <String, Object>{},
   });
 
   /// Logger and meter scope name.
@@ -39,6 +40,10 @@ final class OtelFlutterFrameTimingObserver {
 
   /// Threshold for janky frames.
   final Duration jankFrameThreshold;
+
+  /// Static attributes merged into every recorded metric (e.g.
+  /// `device.tier`). Per-record attributes win on key collision.
+  final Map<String, Object> staticAttributes;
 
   Histogram<double>? _frameDurationHistogramCache;
   Histogram<double>? _buildDurationHistogramCache;
@@ -144,6 +149,7 @@ final class OtelFlutterFrameTimingObserver {
     final buildMilliseconds = buildDuration.inMicroseconds / 1000;
     final rasterMilliseconds = rasterDuration.inMicroseconds / 1000;
     final attributes = <String, Object>{
+      ...staticAttributes,
       'flutter.frame.slow_threshold_ms':
           slowFrameThreshold.inMicroseconds / 1000,
       'flutter.frame.jank_threshold_ms':

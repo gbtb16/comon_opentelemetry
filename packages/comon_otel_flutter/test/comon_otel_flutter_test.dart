@@ -118,6 +118,266 @@ void main() {
     instrumentation.dispose();
   });
 
+  test('startPhase creates a child span of the startup root', () async {
+    final instrumentation = ComonOtelFlutter.install(
+      config: const ComonOtelFlutterConfig(
+        observeAppLifecycle: false,
+        trackNavigatorRoutes: false,
+        markFirstFrame: false,
+      ),
+    );
+
+    final phaseSpan = instrumentation.startupTracker!.startPhase('di');
+    expect(phaseSpan, isNotNull);
+    expect(phaseSpan!.name, 'app.startup.di');
+    expect(phaseSpan.attributes['app.startup.phase'], 'di');
+    await phaseSpan.end();
+    await instrumentation.startupTracker!.completeStartup();
+    await Otel.forceFlush();
+
+    final rootSpan = spanExporter.spans.singleWhere(
+      (span) => span.name == 'app.startup',
+    );
+    final exportedPhaseSpan = spanExporter.spans.singleWhere(
+      (span) => span.name == 'app.startup.di',
+    );
+    expect(exportedPhaseSpan.parentSpanContext?.spanId, rootSpan.spanContext.spanId);
+
+    instrumentation.dispose();
+  });
+
+  test(
+    'trackPhase records a span and a histogram sample on success',
+    () async {
+      final instrumentation = ComonOtelFlutter.install(
+        config: const ComonOtelFlutterConfig(
+          observeAppLifecycle: false,
+          trackNavigatorRoutes: false,
+          markFirstFrame: false,
+        ),
+      );
+
+      final result = await instrumentation.startupTracker!.trackPhase<int>(
+        'firebase',
+        () async {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+          return 42;
+        },
+      );
+      await Otel.forceFlush();
+
+      expect(result, 42);
+      final phaseSpan = spanExporter.spans.singleWhere(
+        (span) => span.name == 'app.startup.firebase',
+      );
+      expect(phaseSpan.attributes['app.startup.phase'], 'firebase');
+      expect(phaseSpan.status, SpanStatus.ok);
+
+      final histogram = metricExporter.lastMetricNamed(
+        'app.startup.phase.duration',
+      );
+      expect(histogram, isNotNull);
+      final point = histogram!.points.single;
+      expect(point.count, 1);
+      expect(point.attributes['app.startup.phase'], 'firebase');
+
+      instrumentation.dispose();
+    },
+  );
+
+  test(
+    'trackPhase records the error status and histogram, then rethrows',
+    () async {
+      final instrumentation = ComonOtelFlutter.install(
+        config: const ComonOtelFlutterConfig(
+          observeAppLifecycle: false,
+          trackNavigatorRoutes: false,
+          markFirstFrame: false,
+        ),
+      );
+
+      await expectLater(
+        instrumentation.startupTracker!.trackPhase<void>('auth_restore', () {
+          throw StateError('boom');
+        }),
+        throwsA(isA<StateError>()),
+      );
+      await Otel.forceFlush();
+
+      final phaseSpan = spanExporter.spans.singleWhere(
+        (span) => span.name == 'app.startup.auth_restore',
+      );
+      expect(phaseSpan.status, SpanStatus.error);
+      expect(
+        phaseSpan.events.map((event) => event.name),
+        contains('exception'),
+      );
+
+      final histogram = metricExporter.lastMetricNamed(
+        'app.startup.phase.duration',
+      );
+      expect(histogram, isNotNull);
+      expect(
+        histogram!.points.single.attributes['app.startup.phase'],
+        'auth_restore',
+      );
+
+      instrumentation.dispose();
+    },
+  );
+
+  test(
+    'trackPhase after completeStartup skips the span but still records the histogram',
+    () async {
+      final instrumentation = ComonOtelFlutter.install(
+        config: const ComonOtelFlutterConfig(
+          observeAppLifecycle: false,
+          trackNavigatorRoutes: false,
+          markFirstFrame: false,
+        ),
+      );
+
+      await instrumentation.startupTracker!.completeStartup();
+      spanExporter.spans.clear();
+
+      final result = await instrumentation.startupTracker!.trackPhase<int>(
+        'migrations',
+        () async => 7,
+      );
+      await Otel.forceFlush();
+
+      expect(result, 7);
+      expect(
+        spanExporter.spans.any(
+          (span) => span.name == 'app.startup.migrations',
+        ),
+        isFalse,
+      );
+
+      final histogram = metricExporter.lastMetricNamed(
+        'app.startup.phase.duration',
+      );
+      expect(histogram, isNotNull);
+      expect(
+        histogram!.points.single.attributes['app.startup.phase'],
+        'migrations',
+      );
+
+      instrumentation.dispose();
+    },
+  );
+
+  test('startPhase and trackPhase are no-ops when Otel is not initialized', () async {
+    await Otel.shutdown();
+
+    final instrumentation = ComonOtelFlutter.install(
+      config: const ComonOtelFlutterConfig(
+        observeAppLifecycle: false,
+        trackNavigatorRoutes: false,
+        markFirstFrame: false,
+      ),
+    );
+
+    expect(instrumentation.startupTracker, isNull);
+  });
+
+  test('setStartupAttribute sets the value on the root span before end, is a no-op after', () async {
+    final instrumentation = ComonOtelFlutter.install(
+      config: const ComonOtelFlutterConfig(
+        observeAppLifecycle: false,
+        trackNavigatorRoutes: false,
+        markFirstFrame: false,
+      ),
+    );
+
+    instrumentation.startupTracker!.setStartupAttribute(
+      'launch.source',
+      'push',
+    );
+    await instrumentation.startupTracker!.completeStartup();
+    // No-op after end: must not throw, and must not overwrite what was
+    // already recorded on the (now ended) root span.
+    instrumentation.startupTracker!.setStartupAttribute(
+      'launch.source',
+      'normal',
+    );
+    await Otel.forceFlush();
+
+    final startupSpan = spanExporter.spans.singleWhere(
+      (span) => span.name == 'app.startup',
+    );
+    expect(startupSpan.attributes['launch.source'], 'push');
+
+    instrumentation.dispose();
+  });
+
+  test('appStartupAttributes are present on the root span from creation', () async {
+    final instrumentation = ComonOtelFlutter.install(
+      config: const ComonOtelFlutterConfig(
+        observeAppLifecycle: false,
+        trackNavigatorRoutes: false,
+        markFirstFrame: false,
+        appStartupAttributes: <String, Object>{'launch.source': 'normal'},
+      ),
+    );
+
+    await instrumentation.startupTracker!.completeStartup();
+    await Otel.forceFlush();
+
+    final startupSpan = spanExporter.spans.singleWhere(
+      (span) => span.name == 'app.startup',
+    );
+    expect(startupSpan.attributes['launch.source'], 'normal');
+
+    instrumentation.dispose();
+  });
+
+  test(
+    'staticMetricAttributes are merged into frame, stall, and startup-phase metrics with per-record override',
+    () async {
+      final instrumentation = ComonOtelFlutter.install(
+        config: const ComonOtelFlutterConfig(
+          observeAppLifecycle: false,
+          trackNavigatorRoutes: false,
+          markFirstFrame: false,
+          staticMetricAttributes: <String, Object>{'device.tier': 'low'},
+        ),
+      );
+
+      instrumentation.frameTimingObserver!.recordFrameSample(
+        totalSpan: const Duration(milliseconds: 10),
+        buildDuration: const Duration(milliseconds: 4),
+        rasterDuration: const Duration(milliseconds: 4),
+      );
+      instrumentation.uiStallObserver!.recordTick(DateTime.utc(2026, 1, 1));
+      instrumentation.uiStallObserver!.recordTick(
+        DateTime.utc(2026, 1, 1, 0, 0, 1),
+      );
+      await instrumentation.startupTracker!.trackPhase<void>(
+        'di',
+        () async {},
+      );
+      await Otel.forceFlush();
+
+      final frameMetric = metricExporter.lastMetricNamed(
+        'flutter.frame.duration',
+      );
+      expect(frameMetric!.points.single.attributes['device.tier'], 'low');
+
+      final stallMetric = metricExporter.lastMetricNamed(
+        'flutter.ui.stall.duration',
+      );
+      expect(stallMetric!.points.single.attributes['device.tier'], 'low');
+
+      final phaseMetric = metricExporter.lastMetricNamed(
+        'app.startup.phase.duration',
+      );
+      expect(phaseMetric!.points.single.attributes['device.tier'], 'low');
+
+      instrumentation.dispose();
+    },
+  );
+
   test('instrumentation records a first interaction marker once', () async {
     final instrumentation = ComonOtelFlutter.install(
       config: const ComonOtelFlutterConfig(observeAppLifecycle: false),
