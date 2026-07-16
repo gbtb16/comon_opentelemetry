@@ -267,6 +267,149 @@ void main() {
     },
   );
 
+  test(
+    'recordCompletedPhase creates a child span with the explicit start/end times',
+    () async {
+      final instrumentation = ComonOtelFlutter.install(
+        config: const ComonOtelFlutterConfig(
+          observeAppLifecycle: false,
+          trackNavigatorRoutes: false,
+          markFirstFrame: false,
+        ),
+      );
+
+      final start = DateTime.utc(2026, 3, 20, 10, 0, 0);
+      final end = DateTime.utc(2026, 3, 20, 10, 0, 0, 240);
+      instrumentation.startupTracker!.recordCompletedPhase(
+        'di',
+        start: start,
+        end: end,
+      );
+      await instrumentation.startupTracker!.completeStartup();
+      await Otel.forceFlush();
+
+      final phaseSpan = spanExporter.spans.singleWhere(
+        (span) => span.name == 'app.startup.di',
+      );
+      expect(phaseSpan.attributes['app.startup.phase'], 'di');
+      expect(phaseSpan.startTime, start);
+      expect(phaseSpan.endTime, end);
+      expect(phaseSpan.status, SpanStatus.ok);
+
+      final rootSpan = spanExporter.spans.singleWhere(
+        (span) => span.name == 'app.startup',
+      );
+      expect(phaseSpan.parentSpanContext?.spanId, rootSpan.spanContext.spanId);
+
+      final histogram = metricExporter.lastMetricNamed(
+        'app.startup.phase.duration',
+      );
+      expect(histogram, isNotNull);
+      final point = histogram!.points.single;
+      expect(point.attributes['app.startup.phase'], 'di');
+      expect(point.sum, closeTo(240, 0.001));
+
+      instrumentation.dispose();
+    },
+  );
+
+  test(
+    'recordCompletedPhase clamps a negative duration to zero but still records',
+    () async {
+      final instrumentation = ComonOtelFlutter.install(
+        config: const ComonOtelFlutterConfig(
+          observeAppLifecycle: false,
+          trackNavigatorRoutes: false,
+          markFirstFrame: false,
+        ),
+      );
+
+      final start = DateTime.utc(2026, 3, 20, 10, 0, 1);
+      final end = DateTime.utc(2026, 3, 20, 10, 0, 0);
+      instrumentation.startupTracker!.recordCompletedPhase(
+        'remote_config',
+        start: start,
+        end: end,
+      );
+      await Otel.forceFlush();
+
+      final histogram = metricExporter.lastMetricNamed(
+        'app.startup.phase.duration',
+      );
+      expect(histogram, isNotNull);
+      final point = histogram!.points.single;
+      expect(point.attributes['app.startup.phase'], 'remote_config');
+      expect(point.sum, 0);
+
+      instrumentation.dispose();
+    },
+  );
+
+  test(
+    'recordCompletedPhase after completeStartup skips the span but still records the histogram',
+    () async {
+      final instrumentation = ComonOtelFlutter.install(
+        config: const ComonOtelFlutterConfig(
+          observeAppLifecycle: false,
+          trackNavigatorRoutes: false,
+          markFirstFrame: false,
+        ),
+      );
+
+      await instrumentation.startupTracker!.completeStartup();
+      spanExporter.spans.clear();
+
+      instrumentation.startupTracker!.recordCompletedPhase(
+        'migrations',
+        start: DateTime.utc(2026, 3, 20, 10, 0, 0),
+        end: DateTime.utc(2026, 3, 20, 10, 0, 0, 100),
+      );
+      await Otel.forceFlush();
+
+      expect(
+        spanExporter.spans.any(
+          (span) => span.name == 'app.startup.migrations',
+        ),
+        isFalse,
+      );
+
+      final histogram = metricExporter.lastMetricNamed(
+        'app.startup.phase.duration',
+      );
+      expect(histogram, isNotNull);
+      final point = histogram!.points.single;
+      expect(point.attributes['app.startup.phase'], 'migrations');
+      expect(point.sum, closeTo(100, 0.001));
+
+      instrumentation.dispose();
+    },
+  );
+
+  test(
+    'recordCompletedPhase is a full no-op once Otel has shut down',
+    () async {
+      final instrumentation = ComonOtelFlutter.install(
+        config: const ComonOtelFlutterConfig(
+          observeAppLifecycle: false,
+          trackNavigatorRoutes: false,
+          markFirstFrame: false,
+        ),
+      );
+      final tracker = instrumentation.startupTracker!;
+
+      await Otel.shutdown();
+
+      expect(
+        () => tracker.recordCompletedPhase(
+          'di',
+          start: DateTime.utc(2026, 3, 20, 10, 0, 0),
+          end: DateTime.utc(2026, 3, 20, 10, 0, 0, 100),
+        ),
+        returnsNormally,
+      );
+    },
+  );
+
   test('startPhase and trackPhase are no-ops when Otel is not initialized', () async {
     await Otel.shutdown();
 
