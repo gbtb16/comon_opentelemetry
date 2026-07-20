@@ -29,6 +29,7 @@ import '../metrics/metric_reader.dart';
 import '../metrics/periodic_metric_reader.dart';
 import '../trace/batch_span_processor.dart';
 import '../trace/sampler.dart';
+import '../trace/session_span_processor.dart';
 import '../trace/simple_span_processor.dart';
 import '../trace/span_limits.dart';
 import '../trace/span_processor.dart';
@@ -37,7 +38,9 @@ import '../trace/tracer_provider.dart';
 import 'otel_config.dart';
 import 'otel_env_config.dart';
 import 'otel_exporter.dart';
+import 'otel_session.dart';
 import 'resource.dart';
+import 'semantic_attributes.dart';
 
 /// Global entry point for configuring and accessing the OpenTelemetry SDK.
 ///
@@ -128,6 +131,7 @@ final class Otel {
     OtlpRetryConfig? otlpTracesRetry,
     OtlpRetryConfig? otlpMetricsRetry,
     OtlpRetryConfig? otlpLogsRetry,
+    String? previousSessionId,
   }) async {
     final existing = _instance;
     if (existing != null) {
@@ -282,7 +286,7 @@ final class Otel {
 
     final processors = resolvedSdkDisabled
         ? const <SpanProcessor>[]
-        : _buildSpanProcessors(config);
+        : <SpanProcessor>[SessionSpanProcessor(), ..._buildSpanProcessors(config)];
     final tracerProvider = TracerProvider(
       resource: resource,
       spanProcessors: processors,
@@ -313,7 +317,26 @@ final class Otel {
       meterProvider: meterProvider,
       loggerProvider: loggerProvider,
     );
+
+    if (!resolvedSdkDisabled &&
+        previousSessionId != null &&
+        previousSessionId.isNotEmpty &&
+        previousSessionId != OtelSession.id &&
+        OtelSession.claimRotationEmission()) {
+      final span = tracerProvider.getTracer('comon_otel').startSpan(
+        'session.rotation',
+        attributes: <String, Object>{
+          SemanticAttributes.sessionId: OtelSession.id,
+          SemanticAttributes.sessionPreviousId: previousSessionId,
+        },
+      );
+      await span.end();
+    }
   }
+
+  /// The current process' session id. See [OtelSession] for the identity
+  /// contract (lazy per-process id, unaffected by re-`init`).
+  static String get sessionId => OtelSession.id;
 
   static List<SpanProcessor> _buildSpanProcessors(OtelConfig config) {
     if (config.spanProcessors.isNotEmpty) {
