@@ -1,11 +1,19 @@
 import 'dart:math';
 
-/// Process-lifetime session identity, independent from any [Otel] instance.
+import 'package:meta/meta.dart';
+
+/// Isolate-lifetime session identity, independent from any [Otel] instance.
 ///
-/// The session id is minted lazily, once per process: the first read wins
-/// and the value survives a warm `Otel.init` re-run in the same process
-/// (state lives here, not on the SDK instance). A fresh process starts with
-/// fresh static state, so it mints a new id.
+/// The session id is minted lazily, once per isolate (the app's main
+/// isolate, in practice — Dart statics are isolate-local, not
+/// process-global): the first read wins and the value survives a warm
+/// `Otel.init` re-run on that same isolate (state lives here, not on the
+/// SDK instance). A fresh isolate — in practice, a fresh app process —
+/// starts with fresh static state, so it mints a new id.
+///
+/// Not exported from the package barrel: [Otel.sessionId] is the public
+/// surface. Import this class directly (`package:comon_otel/src/core/...`)
+/// only from tests, to use [resetForTesting].
 final class OtelSession {
   OtelSession._();
 
@@ -13,14 +21,14 @@ final class OtelSession {
   static bool _rotationEmitted = false;
   static final Random _random = Random.secure();
 
-  /// The current process' session id, minting one on first access.
+  /// The current isolate's session id, minting one on first access.
   static String get id => _sessionId ??= _generateUuidV4();
 
-  /// Marks the session-rotation span as emitted for this process.
+  /// Marks the session-rotation span as emitted for this isolate.
   ///
   /// Returns `true` the first time it is called (caller should emit the
   /// span) and `false` on every subsequent call, so the rotation span is
-  /// emitted at most once per process.
+  /// emitted at most once per isolate.
   static bool claimRotationEmission() {
     if (_rotationEmitted) {
       return false;
@@ -30,7 +38,8 @@ final class OtelSession {
   }
 
   /// Resets all session state. Test-only — production code must never call
-  /// this, since it defeats the "one id per process" contract.
+  /// this, since it defeats the "one id per isolate" contract.
+  @visibleForTesting
   static void resetForTesting() {
     _sessionId = null;
     _rotationEmitted = false;

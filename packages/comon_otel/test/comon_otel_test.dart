@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:comon_otel/comon_otel.dart';
+import 'package:comon_otel/src/core/otel_session.dart';
 import 'package:comon_otel/src/exporters/otlp/common/exporter_headers.dart';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
