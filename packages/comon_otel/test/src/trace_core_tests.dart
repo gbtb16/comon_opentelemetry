@@ -662,14 +662,18 @@ void defineTraceCoreTests() {
 
       final exported = exporter.lastSpanNamed('limited-span');
       expect(exported, isNotNull);
-      expect(exported!.attributes, <String, Object>{'a': 1, 'b': 20});
+      // session.id is reserved (SessionSpanProcessor.onStart) — it always
+      // survives the attribute limit alongside the two kept user attrs.
+      expect(exported!.attributes, <String, Object>{
+        'a': 1,
+        'b': 20,
+        SemanticAttributes.sessionId: OtelSession.id,
+      });
       expect(exported.events, hasLength(1));
       expect(exported.events.single.attributes, <String, Object>{'x': 1});
       expect(exported.links, hasLength(1));
       expect(exported.links.single.attributes, <String, Object>{'keep': 1});
-      // +1 vs. the pre-session-id baseline: SessionSpanProcessor.onStart
-      // also competes for the tight attribute budget and gets dropped too.
-      expect(exported.droppedAttributesCount, 5);
+      expect(exported.droppedAttributesCount, 4);
       expect(exported.droppedEventsCount, 1);
       expect(exported.droppedLinksCount, 1);
     });

@@ -44,6 +44,7 @@ final class Span {
   final Span? _parentSpan;
   final SpanContext? _parentSpanContext;
   final Map<String, Object> _attributes = <String, Object>{};
+  final Set<String> _reservedAttributeKeys = <String>{};
   final List<SpanEvent> _events = <SpanEvent>[];
   final List<SpanLink> _links = <SpanLink>[];
 
@@ -135,17 +136,43 @@ final class Span {
   DateTime? get endTime => _endTime;
 
   /// Sets a single span attribute if the span is still recording.
+  ///
+  /// Counts against [SpanLimits.attributeCountLimit] like any user
+  /// attribute. Reserved keys set via [setReservedAttribute] are excluded
+  /// from that count, so they never crowd out — or get crowded out by —
+  /// user-supplied attributes.
   void setAttribute(String key, Object value) {
     if (hasEnded || !isRecording) {
       return;
     }
 
+    if (_reservedAttributeKeys.contains(key)) {
+      _attributes[key] = value;
+      return;
+    }
+
+    final userAttributeCount = _attributes.length - _reservedAttributeKeys.length;
     if (!_attributes.containsKey(key) &&
-        _attributes.length >= _limits.attributeCountLimit) {
+        userAttributeCount >= _limits.attributeCountLimit) {
       _droppedAttributesCount += 1;
       return;
     }
 
+    _attributes[key] = value;
+  }
+
+  /// Sets a single span attribute reserved for SDK-internal identity data
+  /// (e.g. `session.id`), bypassing [SpanLimits.attributeCountLimit].
+  ///
+  /// Not for user-supplied instrumentation data — reserved attributes are
+  /// exempt from span attribute limits so they can never be evicted by, or
+  /// evict, ordinary attributes.
+  void setReservedAttribute(String key, Object value) {
+    if (hasEnded || !isRecording) {
+      return;
+    }
+
+    _reservedAttributeKeys.add(key);
     _attributes[key] = value;
   }
 

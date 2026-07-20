@@ -3,7 +3,7 @@ import '../core/semantic_attributes.dart';
 import 'span.dart';
 import 'span_processor.dart';
 
-/// Stamps every started span with the process' [OtelSession.id].
+/// Stamps every started span with the isolate's [OtelSession.id].
 ///
 /// Installed unconditionally by [Otel.init], ahead of user-provided
 /// processors, so `session.id` is present on every exported span
@@ -11,7 +11,9 @@ import 'span_processor.dart';
 final class SessionSpanProcessor implements SpanProcessor {
   @override
   void onStart(Span span) {
-    span.setAttribute(SemanticAttributes.sessionId, OtelSession.id);
+    // Reserved: must survive span attribute limits, however tight — the
+    // session identity is SDK-internal, not user instrumentation data.
+    span.setReservedAttribute(SemanticAttributes.sessionId, OtelSession.id);
   }
 
   @override
