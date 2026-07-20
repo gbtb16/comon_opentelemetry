@@ -14,6 +14,7 @@ part 'src/propagation_testing_tests.dart';
 part 'src/config_resource_tests.dart';
 part 'src/http_transport_tests.dart';
 part 'src/batch_processor_health_tests.dart';
+part 'src/session_tests.dart';
 
 late InMemorySpanExporter exporter;
 late InMemoryMetricExporter metricExporter;
@@ -50,5 +51,6 @@ void main() {
     defineConfigAndResourceTests();
     defineHttpTransportTests();
     defineBatchProcessorHealthTests();
+    defineSessionTests();
   });
 }

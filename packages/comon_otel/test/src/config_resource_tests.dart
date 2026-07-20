@@ -362,7 +362,9 @@ void defineConfigAndResourceTests() {
       expect(exportedSpan.events.single.attributes.keys, <String>['a']);
       expect(exportedSpan.links, hasLength(1));
       expect(exportedSpan.links.single.attributes.keys, <String>['a']);
-      expect(exportedSpan.droppedAttributesCount, 3);
+      // +1 vs. the pre-session-id baseline: SessionSpanProcessor.onStart
+      // also competes for the tight attribute budget and gets dropped too.
+      expect(exportedSpan.droppedAttributesCount, 4);
       expect(exportedSpan.droppedEventsCount, 0);
       expect(exportedSpan.droppedLinksCount, 1);
     });

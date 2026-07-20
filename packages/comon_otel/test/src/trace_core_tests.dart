@@ -667,7 +667,9 @@ void defineTraceCoreTests() {
       expect(exported.events.single.attributes, <String, Object>{'x': 1});
       expect(exported.links, hasLength(1));
       expect(exported.links.single.attributes, <String, Object>{'keep': 1});
-      expect(exported.droppedAttributesCount, 4);
+      // +1 vs. the pre-session-id baseline: SessionSpanProcessor.onStart
+      // also competes for the tight attribute budget and gets dropped too.
+      expect(exported.droppedAttributesCount, 5);
       expect(exported.droppedEventsCount, 1);
       expect(exported.droppedLinksCount, 1);
     });
