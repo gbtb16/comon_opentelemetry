@@ -14,7 +14,7 @@ final class SemanticAttributes {
   /// Deployment environment resource attribute.
   static const String deploymentEnvironment = 'deployment.environment';
 
-  /// Process-lifetime session identifier attribute, stamped on every span
+  /// Isolate-lifetime session identifier attribute, stamped on every span
   /// and log record (never on metrics — see the cardinality contract).
   static const String sessionId = 'session.id';
 

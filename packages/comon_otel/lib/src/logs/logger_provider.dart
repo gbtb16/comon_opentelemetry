@@ -24,7 +24,7 @@ final class LoggerProvider {
 
   /// Sends [record] through every configured log processor.
   ///
-  /// Every record is stamped with the process' `session.id` first. Log
+  /// Every record is stamped with the isolate's `session.id` first. Log
   /// records are immutable value objects and [LogProcessor.onEmit] fans out
   /// to every configured processor with the same instance (unlike spans,
   /// there is no in-place mutation or per-processor chaining) — so the

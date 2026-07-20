@@ -334,8 +334,8 @@ final class Otel {
     }
   }
 
-  /// The current process' session id. See [OtelSession] for the identity
-  /// contract (lazy per-process id, unaffected by re-`init`).
+  /// The current isolate's session id. See [OtelSession] for the identity
+  /// contract (lazy per-isolate id, unaffected by re-`init`).
   static String get sessionId => OtelSession.id;
 
   static List<SpanProcessor> _buildSpanProcessors(OtelConfig config) {
