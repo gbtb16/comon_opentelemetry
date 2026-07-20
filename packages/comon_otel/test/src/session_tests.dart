@@ -102,6 +102,10 @@ void defineSessionTests() {
     );
 
     test('init without previousSessionId never emits a rotation span', () async {
+      await Otel.init(
+        serviceName: 'test-service',
+        spanProcessors: <SpanProcessor>[SimpleSpanProcessor(exporter)],
+      );
       await Otel.forceFlush();
 
       expect(exporter.spansNamed('session.rotation'), isEmpty);
