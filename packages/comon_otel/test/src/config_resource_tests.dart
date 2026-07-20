@@ -358,7 +358,12 @@ void defineConfigAndResourceTests() {
       await Future<void>.delayed(Duration.zero);
 
       final exportedSpan = envExporter.lastSpanNamed('limited-span')!;
-      expect(exportedSpan.attributes.keys, <String>['first']);
+      // session.id is reserved (SessionSpanProcessor.onStart) — it always
+      // survives the attribute limit alongside the one kept user attr.
+      expect(exportedSpan.attributes.keys, <String>[
+        'first',
+        SemanticAttributes.sessionId,
+      ]);
       expect(exportedSpan.events.single.attributes.keys, <String>['a']);
       expect(exportedSpan.links, hasLength(1));
       expect(exportedSpan.links.single.attributes.keys, <String>['a']);

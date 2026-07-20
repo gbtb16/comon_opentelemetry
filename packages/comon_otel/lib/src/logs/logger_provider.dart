@@ -1,4 +1,6 @@
+import '../core/otel_session.dart';
 import '../core/resource.dart';
+import '../core/semantic_attributes.dart';
 import 'log_processor.dart';
 import 'log_record.dart';
 import 'otel_logger.dart';
@@ -21,10 +23,35 @@ final class LoggerProvider {
   }
 
   /// Sends [record] through every configured log processor.
+  ///
+  /// Every record is stamped with the isolate's `session.id` first. Log
+  /// records are immutable value objects and [LogProcessor.onEmit] fans out
+  /// to every configured processor with the same instance (unlike spans,
+  /// there is no in-place mutation or per-processor chaining) — so the
+  /// stamping happens here, at the single funnel point all records pass
+  /// through, rather than as a `LogProcessor` entry in the list.
   void emit(LogRecord record) {
+    final stamped = _stampSession(record);
     for (final processor in _logProcessors) {
-      processor.onEmit(record);
+      processor.onEmit(stamped);
     }
+  }
+
+  LogRecord _stampSession(LogRecord record) {
+    return LogRecord(
+      timestamp: record.timestamp,
+      observedTimestamp: record.observedTimestamp,
+      severity: record.severity,
+      severityText: record.severityText,
+      body: record.body,
+      resource: record.resource,
+      spanContext: record.spanContext,
+      loggerName: record.loggerName,
+      attributes: <String, Object>{
+        ...record.attributes,
+        SemanticAttributes.sessionId: OtelSession.id,
+      },
+    );
   }
 
   /// Flushes all configured log processors.

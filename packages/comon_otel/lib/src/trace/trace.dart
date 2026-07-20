@@ -2,6 +2,7 @@ library;
 
 export 'batch_span_processor.dart';
 export 'sampler.dart';
+export 'session_span_processor.dart';
 export 'simple_span_processor.dart';
 export 'span.dart';
 export 'span_id.dart';

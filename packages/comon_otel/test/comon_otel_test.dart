@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:comon_otel/comon_otel.dart';
+import 'package:comon_otel/src/core/otel_session.dart';
 import 'package:comon_otel/src/exporters/otlp/common/exporter_headers.dart';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
@@ -14,6 +15,7 @@ part 'src/propagation_testing_tests.dart';
 part 'src/config_resource_tests.dart';
 part 'src/http_transport_tests.dart';
 part 'src/batch_processor_health_tests.dart';
+part 'src/session_tests.dart';
 
 late InMemorySpanExporter exporter;
 late InMemoryMetricExporter metricExporter;
@@ -50,5 +52,6 @@ void main() {
     defineConfigAndResourceTests();
     defineHttpTransportTests();
     defineBatchProcessorHealthTests();
+    defineSessionTests();
   });
 }
