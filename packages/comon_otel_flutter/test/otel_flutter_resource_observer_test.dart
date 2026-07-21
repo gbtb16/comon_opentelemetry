@@ -125,6 +125,49 @@ void main() {
       observer.dispose();
       await controller.close();
     });
+
+    test('a throwing level getter does not crash and records no point', () async {
+      final observer = OtelFlutterResourceObserver(
+        trackBatteryMetrics: true,
+        batteryLevelGetter: () async => throw StateError('boom'),
+        batteryStateStreamGetter: () => const Stream<String>.empty(),
+      );
+
+      observer.start();
+      await observer.recordBatteryMoment('startup');
+      await Otel.forceFlush();
+
+      expect(
+        metricExporter.lastMetricNamed('app.device.battery.level'),
+        isNull,
+      );
+
+      observer.dispose();
+    });
+
+    test(
+      'a battery-state stream error does not crash start()/dispose()',
+      () async {
+        final observer = OtelFlutterResourceObserver(
+          trackBatteryMetrics: true,
+          batteryLevelGetter: () async => 10,
+          batteryStateStreamGetter: () =>
+              Stream<String>.error(StateError('battery stream boom')),
+        );
+
+        await runZonedGuarded(
+          () async {
+            observer.start();
+            await Future<void>.delayed(Duration.zero);
+            await Otel.forceFlush();
+            observer.dispose();
+          },
+          (error, stackTrace) {
+            fail('unhandled error escaped the observer: $error');
+          },
+        );
+      },
+    );
   });
 
   group('thermal (AC3)', () {
@@ -206,6 +249,80 @@ void main() {
         0,
         (total, point) => total + (point.value ?? 0),
       );
+      expect(totalCount, 1);
+
+      await controller.close();
+    });
+
+    test(
+      'an error mid-stream does not crash and later events still count',
+      () async {
+        final controller = StreamController<String>();
+        final observer = OtelFlutterResourceObserver(
+          trackThermalMetrics: true,
+          thermalStateStreamGetter: () => controller.stream,
+        );
+
+        await runZonedGuarded(
+          () async {
+            observer.start();
+            controller.add('nominal');
+            await Future<void>.delayed(Duration.zero);
+            controller.addError(StateError('thermal stream boom'));
+            await Future<void>.delayed(Duration.zero);
+            controller.add('fair');
+            await Future<void>.delayed(Duration.zero);
+            await Otel.forceFlush();
+          },
+          (error, stackTrace) {
+            fail('unhandled error escaped the observer: $error');
+          },
+        );
+
+        final metric = metricExporter.lastMetricNamed(
+          'app.device.thermal.count',
+        );
+        expect(metric, isNotNull);
+        final totalCount = metric!.points.fold<num>(
+          0,
+          (total, point) => total + (point.value ?? 0),
+        );
+        // 'nominal' (first state) + 'fair' (real transition) despite the
+        // error in between = 2, the stream error itself must not count.
+        expect(totalCount, 2);
+
+        observer.dispose();
+        await controller.close();
+      },
+    );
+
+    test('double start() does not leak/duplicate the subscription', () async {
+      final controller = StreamController<String>.broadcast();
+      final observer = OtelFlutterResourceObserver(
+        trackThermalMetrics: true,
+        thermalStateStreamGetter: () => controller.stream,
+      );
+
+      observer.start();
+      observer.start();
+      controller.add('nominal');
+      await Future<void>.delayed(Duration.zero);
+      observer.dispose();
+
+      controller.add('fair');
+      await Future<void>.delayed(Duration.zero);
+      await Otel.forceFlush();
+
+      final metric = metricExporter.lastMetricNamed(
+        'app.device.thermal.count',
+      );
+      expect(metric, isNotNull);
+      final totalCount = metric!.points.fold<num>(
+        0,
+        (total, point) => total + (point.value ?? 0),
+      );
+      // If start() leaked a duplicate subscription, 'nominal' would count
+      // twice (2) instead of once.
       expect(totalCount, 1);
 
       await controller.close();

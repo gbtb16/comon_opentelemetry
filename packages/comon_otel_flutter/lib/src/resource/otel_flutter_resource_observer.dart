@@ -269,14 +269,22 @@ final class OtelFlutterResourceObserver {
 
   /// Starts subscriptions for signals that require live streams (battery
   /// state, thermal state). Disabled signals are never subscribed.
+  ///
+  /// Idempotent-safe: cancels any subscription from a previous [start] call
+  /// before re-subscribing, so calling it twice (or start→dispose→start)
+  /// never leaks a subscription.
   void start() {
     if (trackBatteryMetrics) {
       // Touch the gauge so the instrument is created even if the state
       // stream never emits before the first collection.
       // ignore: unnecessary_statements
       _batteryStateGauge;
+      unawaited(_batteryStateSubscription?.cancel());
       _batteryStateSubscription = _batteryStateStreamGetter().listen((state) {
         _batteryState = state;
+      }, onError: (Object error, StackTrace stackTrace) {
+        // Telemetria nunca quebra o host: um erro no stream de estado da
+        // bateria apenas mantém o último estado conhecido (ou nenhum).
       });
     }
 
@@ -288,6 +296,7 @@ final class OtelFlutterResourceObserver {
     }
 
     if (trackThermalMetrics && thermalStateStreamGetter != null) {
+      unawaited(_thermalSubscription?.cancel());
       _thermalSubscription = thermalStateStreamGetter!().listen((state) {
         final previous = _lastThermalState;
         _lastThermalState = state;
@@ -298,6 +307,9 @@ final class OtelFlutterResourceObserver {
           1,
           attributes: <String, Object>{...staticAttributes, 'state': state},
         );
+      }, onError: (Object error, StackTrace stackTrace) {
+        // Telemetria nunca quebra o host: um erro no stream térmico apenas
+        // interrompe a contagem daquele ciclo, sem propagar a exceção.
       });
     }
   }
