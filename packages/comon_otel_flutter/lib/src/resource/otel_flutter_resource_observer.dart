@@ -212,7 +212,10 @@ final class OtelFlutterResourceObserver {
           description: 'Process resident set size sampled at collection.',
           callback: (result) {
             try {
-              result.observe(ProcessInfo.currentRss.toDouble());
+              result.observe(
+                ProcessInfo.currentRss.toDouble(),
+                attributes: staticAttributes,
+              );
             } catch (_) {
               // Telemetria nunca quebra o host: falha ao ler RSS apenas
               // resulta em nenhuma observação neste ciclo.

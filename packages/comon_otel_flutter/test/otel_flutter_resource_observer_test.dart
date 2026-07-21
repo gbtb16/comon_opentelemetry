@@ -43,12 +43,22 @@ void main() {
 
     test('disabled signals never subscribe, record, or emit', () async {
       var thermalStreamCalled = false;
+      var storageGetterCalled = false;
+      var batteryLevelGetterCalled = false;
       final observer = OtelFlutterResourceObserver(
-        storageFreeBytesGetter: () async => 123,
+        storageFreeBytesGetter: () async {
+          storageGetterCalled = true;
+          return 123;
+        },
         thermalStateStreamGetter: () {
           thermalStreamCalled = true;
           return const Stream<String>.empty();
         },
+        batteryLevelGetter: () async {
+          batteryLevelGetterCalled = true;
+          return 50;
+        },
+        batteryStateStreamGetter: () => const Stream<String>.empty(),
       );
 
       observer.start();
@@ -57,6 +67,8 @@ void main() {
       await Otel.forceFlush();
 
       expect(thermalStreamCalled, isFalse);
+      expect(storageGetterCalled, isFalse);
+      expect(batteryLevelGetterCalled, isFalse);
       expect(metricExporter.lastMetricNamed('app.device.storage.free'), isNull);
       expect(
         metricExporter.lastMetricNamed('app.device.battery.level'),
@@ -121,10 +133,44 @@ void main() {
       final point = metric!.points.single;
       expect(point.value, 1.0);
       expect(point.attributes['state'], 'charging');
+      expect(point.attributes.keys.toSet(), <String>{'state'});
 
       observer.dispose();
       await controller.close();
     });
+
+    test(
+      'state gauge merges staticAttributes with the state label',
+      () async {
+        final controller = StreamController<String>();
+        final observer = OtelFlutterResourceObserver(
+          trackBatteryMetrics: true,
+          batteryLevelGetter: () async => 10,
+          batteryStateStreamGetter: () => controller.stream,
+          staticAttributes: const <String, Object>{'device.tier': 'low'},
+        );
+
+        observer.start();
+        controller.add('discharging');
+        await Future<void>.delayed(Duration.zero);
+        await Otel.forceFlush();
+
+        final metric = metricExporter.lastMetricNamed(
+          'app.device.battery.state',
+        );
+        expect(metric, isNotNull);
+        final point = metric!.points.single;
+        expect(point.attributes.keys.toSet(), <String>{
+          'state',
+          'device.tier',
+        });
+        expect(point.attributes['state'], 'discharging');
+        expect(point.attributes['device.tier'], 'low');
+
+        observer.dispose();
+        await controller.close();
+      },
+    );
 
     test('a throwing level getter does not crash and records no point', () async {
       final observer = OtelFlutterResourceObserver(
@@ -195,15 +241,17 @@ void main() {
         'app.device.thermal.count',
       );
       expect(metric, isNotNull);
-      final statesSeen = metric!.points.map(
-        (point) => point.attributes['state'],
-      );
-      expect(statesSeen, containsAll(<String>['fair', 'serious', 'critical']));
-      final totalCount = metric.points.fold<num>(
-        0,
-        (total, point) => total + (point.value ?? 0),
-      );
-      expect(totalCount, 4);
+      final countByState = <Object?, num>{};
+      for (final point in metric!.points) {
+        final state = point.attributes['state'];
+        countByState[state] = (countByState[state] ?? 0) + (point.value ?? 0);
+      }
+      expect(countByState, <String, num>{
+        'nominal': 1,
+        'fair': 1,
+        'serious': 1,
+        'critical': 1,
+      });
 
       observer.dispose();
       await controller.close();
@@ -231,9 +279,11 @@ void main() {
       );
 
       observer.start();
+      expect(controller.hasListener, isTrue);
       controller.add('nominal');
       await Future<void>.delayed(Duration.zero);
       observer.dispose();
+      expect(controller.hasListener, isFalse);
 
       controller.add('fair');
       await Future<void>.delayed(Duration.zero);
@@ -353,13 +403,15 @@ void main() {
       );
       expect(metric, isNotNull);
       expect(metric!.points, hasLength(3));
-      final milestonesSeen = metric.points.map(
-        (point) => point.attributes['milestone'],
-      );
-      expect(
-        milestonesSeen,
-        containsAll(<String>['before_photo_write', 'before_sync', 'startup']),
-      );
+      final bytesByMilestone = <Object?, Object?>{
+        for (final point in metric.points)
+          point.attributes['milestone']: point.value,
+      };
+      expect(bytesByMilestone, <String, num>{
+        'before_photo_write': 1000,
+        'before_sync': 2000,
+        'startup': 3000,
+      });
       for (final point in metric.points) {
         expect(point.attributes.containsKey('path'), isFalse);
         expect(point.attributes.containsKey('filename'), isFalse);
