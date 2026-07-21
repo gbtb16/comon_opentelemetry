@@ -9,6 +9,7 @@ import 'lifecycle/otel_flutter_binding_observer.dart';
 import 'navigation/otel_navigator_observer.dart';
 import 'performance/otel_flutter_frame_timing_observer.dart';
 import 'performance/otel_flutter_ui_stall_observer.dart';
+import 'resource/otel_flutter_resource_observer.dart';
 import 'startup/otel_flutter_startup_tracker.dart';
 
 /// Signature of the platform dispatcher error callback.
@@ -100,6 +101,30 @@ final class ComonOtelFlutter {
 
     uiStallObserver?.start();
 
+    final resourceObserver =
+        (config.trackBatteryMetrics ||
+            config.trackThermalMetrics ||
+            config.trackStorageMetrics ||
+            config.trackRssMetrics)
+        ? OtelFlutterResourceObserver(
+            loggerName: config.loggerName,
+            trackStorageMetrics: config.trackStorageMetrics,
+            trackBatteryMetrics: config.trackBatteryMetrics,
+            trackThermalMetrics: config.trackThermalMetrics,
+            trackRssMetrics: config.trackRssMetrics,
+            storageFreeMetricName: config.storageFreeMetricName,
+            batteryLevelMetricName: config.batteryLevelMetricName,
+            batteryStateMetricName: config.batteryStateMetricName,
+            thermalCountMetricName: config.thermalCountMetricName,
+            processRssMetricName: config.processRssMetricName,
+            staticAttributes: config.staticMetricAttributes,
+            storageFreeBytesGetter: config.storageFreeBytesGetter,
+            thermalStateStreamGetter: config.thermalStateStreamGetter,
+          )
+        : null;
+
+    resourceObserver?.start();
+
     final startupTracker = config.trackAppStartup
         ? OtelFlutterStartupTracker.start(
             binding: resolvedBinding,
@@ -145,6 +170,7 @@ final class ComonOtelFlutter {
       navigatorObserver: navigatorObserver,
       frameTimingObserver: frameTimingObserver,
       uiStallObserver: uiStallObserver,
+      resourceObserver: resourceObserver,
       startupTracker: startupTracker,
       previousFlutterErrorHandler: previousFlutterErrorHandler,
       previousPlatformErrorHandler: previousPlatformErrorHandler,
@@ -163,6 +189,7 @@ final class ComonOtelFlutterInstrumentation {
     required this.navigatorObserver,
     required this.frameTimingObserver,
     required this.uiStallObserver,
+    required this.resourceObserver,
     required this.startupTracker,
     required this.previousFlutterErrorHandler,
     required this.previousPlatformErrorHandler,
@@ -175,6 +202,13 @@ final class ComonOtelFlutterInstrumentation {
   final OtelNavigatorObserver? navigatorObserver;
   final OtelFlutterFrameTimingObserver? frameTimingObserver;
   final OtelFlutterUiStallObserver? uiStallObserver;
+
+  /// Observer for device-resource metrics (storage/battery/thermal/RSS).
+  /// Non-null only when at least one of `trackBatteryMetrics`,
+  /// `trackThermalMetrics`, `trackStorageMetrics`, or `trackRssMetrics` was
+  /// enabled — use it to call [OtelFlutterResourceObserver.recordStorageMilestone]
+  /// / [OtelFlutterResourceObserver.recordBatteryMoment] from the app.
+  final OtelFlutterResourceObserver? resourceObserver;
   final OtelFlutterStartupTracker? startupTracker;
   final FlutterExceptionHandler? previousFlutterErrorHandler;
   final OtelPlatformErrorCallback? previousPlatformErrorHandler;
@@ -195,6 +229,7 @@ final class ComonOtelFlutterInstrumentation {
       _binding.removeTimingsCallback(frameTimingObserver!.onFrameTimings);
     }
     uiStallObserver?.dispose();
+    resourceObserver?.dispose();
     navigatorObserver?.dispose();
     startupTracker?.dispose();
     if (restoreFlutterErrors) {
