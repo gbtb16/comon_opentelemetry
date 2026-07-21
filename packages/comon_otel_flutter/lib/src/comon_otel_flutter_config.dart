@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'errors/otel_flutter_error_hooks.dart';
+import 'resource/otel_flutter_resource_types.dart';
 
 /// Clock source used by Flutter instrumentation components.
 typedef OtelFlutterNow = DateTime Function();
@@ -23,6 +24,10 @@ final class ComonOtelFlutterConfig {
     this.trackMemoryPressureMetrics = true,
     this.trackUiStalls = true,
     this.trackBreadcrumbs = true,
+    this.trackBatteryMetrics = false,
+    this.trackThermalMetrics = false,
+    this.trackStorageMetrics = false,
+    this.trackRssMetrics = false,
     this.breadcrumbListener,
     this.frameworkErrorListener,
     this.platformErrorListener,
@@ -47,6 +52,13 @@ final class ComonOtelFlutterConfig {
     this.uiStallCheckInterval = const Duration(milliseconds: 50),
     this.uiStallThreshold = const Duration(milliseconds: 100),
     this.breadcrumbCapacity = 20,
+    this.storageFreeMetricName = 'app.device.storage.free',
+    this.batteryLevelMetricName = 'app.device.battery.level',
+    this.batteryStateMetricName = 'app.device.battery.state',
+    this.thermalCountMetricName = 'app.device.thermal.count',
+    this.processRssMetricName = 'app.process.memory.rss',
+    this.storageFreeBytesGetter,
+    this.thermalStateStreamGetter,
     this.appStartupStartTime,
     this.appStartupAttributes,
     this.staticMetricAttributes = const <String, Object>{},
@@ -92,6 +104,27 @@ final class ComonOtelFlutterConfig {
 
   /// Whether to collect breadcrumbs for navigation, lifecycle, and errors.
   final bool trackBreadcrumbs;
+
+  /// Whether to record battery level/state metrics.
+  ///
+  /// Defaults to `false`: this is a new, continuously-sampled signal, opt-in
+  /// per app via feature flag.
+  final bool trackBatteryMetrics;
+
+  /// Whether to count thermal state transitions.
+  ///
+  /// Defaults to `false` — same rationale as [trackBatteryMetrics].
+  final bool trackThermalMetrics;
+
+  /// Whether to record free storage milestone gauges.
+  ///
+  /// Defaults to `false` — same rationale as [trackBatteryMetrics].
+  final bool trackStorageMetrics;
+
+  /// Whether to record the process RSS (resident set size) gauge.
+  ///
+  /// Defaults to `false` — same rationale as [trackBatteryMetrics].
+  final bool trackRssMetrics;
 
   /// Optional listener invoked for each recorded breadcrumb.
   final OtelFlutterBreadcrumbListener? breadcrumbListener;
@@ -169,6 +202,31 @@ final class ComonOtelFlutterConfig {
 
   /// Maximum number of breadcrumbs retained in memory.
   final int breadcrumbCapacity;
+
+  /// Metric name for the free storage milestone gauge.
+  final String storageFreeMetricName;
+
+  /// Metric name for the battery level histogram.
+  final String batteryLevelMetricName;
+
+  /// Metric name for the battery state gauge.
+  final String batteryStateMetricName;
+
+  /// Metric name for the thermal state transition counter.
+  final String thermalCountMetricName;
+
+  /// Metric name for the process RSS gauge.
+  final String processRssMetricName;
+
+  /// Injected reader for current free storage bytes. Required (non-null)
+  /// for [trackStorageMetrics] to have any effect — without it the observer
+  /// never creates the storage gauge.
+  final StorageFreeBytesGetter? storageFreeBytesGetter;
+
+  /// Injected stream of already-mapped thermal state strings. Required
+  /// (non-null) for [trackThermalMetrics] to have any effect — without it
+  /// the observer never subscribes.
+  final ThermalStateStreamGetter? thermalStateStreamGetter;
 
   /// Optional explicit app startup start time.
   final DateTime? appStartupStartTime;
